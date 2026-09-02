@@ -1,0 +1,9 @@
+# Core (stylometry only) — no ML dependencies
+numpy>=1.24
+
+# Optional: local surprisal scoring
+# torch>=2.0
+# transformers>=4.40
+
+# Optional: web UI
+# gradio>=4.0

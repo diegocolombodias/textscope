@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local models and generated artifacts
+models/
+reference.json
+
+# Original zip (source already extracted and tracked)
+textscope.zip
