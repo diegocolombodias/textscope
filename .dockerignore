@@ -1,0 +1,8 @@
+.git
+textscope.zip
+__pycache__/
+*.pyc
+.venv/
+venv/
+models/
+reference.json

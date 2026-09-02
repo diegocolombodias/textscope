@@ -101,6 +101,8 @@ def main() -> None:
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--reference", default=None)
     ap.add_argument("--port", type=int, default=7860)
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="bind address (use 0.0.0.0 inside a container)")
     args = ap.parse_args()
 
     if args.model:
@@ -130,8 +132,9 @@ def main() -> None:
 
         btn.click(analyze, inputs=[inp, lang], outputs=[out_html, out_md])
 
-    # share=False and server_name on loopback: no external exposure.
-    demo.launch(server_name="127.0.0.1", server_port=args.port, share=False)
+    # share=False: no tunneling through Gradio's servers. Binding is
+    # explicit via --host (loopback by default, 0.0.0.0 in a container).
+    demo.launch(server_name=args.host, server_port=args.port, share=False)
 
 
 if __name__ == "__main__":
