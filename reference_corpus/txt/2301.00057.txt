@@ -1,0 +1,580 @@
+A Mapping of Assurance Techniques for Learning Enabled
+Autonomous Systems to the Systems Engineering Lifecycle
+
+Christian Ellis1 , Maggie Wigness2 , and Lance Fiondella1
+
+Abstract—Learning enabled autonomous systems provide increased capabilities compared to traditional systems. However,
+the complexity of and probabilistic nature in the underlying
+methods enabling such capabilities present challenges for current
+systems engineering processes for assurance, and test, evaluation, verification, and validation (TEVV). This paper provides
+a preliminary attempt to map recently developed technical
+approaches in the assurance and TEVV of learning enabled
+autonomous systems (LEAS) literature to a traditional systems
+engineering v-model. This mapping categorizes such techniques
+into three main approaches: development, acquisition, and
+sustainment. We review the latest techniques to develop safe,
+reliable, and resilient learning enabled autonomous systems,
+without recommending radical and impractical changes to existing systems engineering processes. By performing this mapping,
+we seek to assist acquisition professionals by (i) informing
+comprehensive test and evaluation planning, and (ii) objectively
+communicating risk to leaders.
+
+I. I NTRODUCTION
+It is widely recognized [1] that the complexity and resulting
+capabilities of autonomous systems created using machine
+learning methods, which we refer to as learning enabled
+autonomous systems (LEAS), pose new challenges to systems engineering compared to their traditional counterparts.
+Moreover, the inability to translate qualitative assessments
+to quantitative metrics which measure system performance
+hinder adoption. Such limitations make it difficult to produce
+reliable systems, and even harder to assure [2]. Without understanding the capabilities and limitations of existing assurance
+techniques, defining safety and performance requirements that
+are both clear and testable remains out of reach.
+Mature test, evaluation, verification, and validation (TEVV)
+methods have been in use for decades to ensure the safety
+analysis and acquisition of hardware systems [3], but fewer
+TEVV methods for software are available, and even fewer
+for software that improves itself through learning [4]. Initial
+approaches to autonomous systems use control theory to
+physically model the world and its underlying dynamics [5],
+while LEAS infer and generalize statistical patterns, which
+lead to the achievement of goals from a sample of precollected training data points. However, due to the nature of
+the environments where LEAS are fielded and the massive
+size of their underlying state spaces, systems will likely
+encounter states during operation they have never experienced
+before, yet still being required to take action.
+1 Christian Ellis is a PhD Student and Lance Fiondella is an Associate Professor in the Department of Electrical and Computer Engineering at the University of Massachusetts Dartmouth, USA. cellis3,
+
+Fig. 1: Recent work in assurance for LEAS is mapped to
+relevant stages of the MITRE systems engineering lifecycle [6], into 3 distinct categories—development, acquisition,
+and sustainment.
+
+Early work from the autonomy community identified issues
+that arise from incorporating learning into autonomous systems [4] including state space explosion, operation in unpredictable environments, emergent behavior, and effective human machine interaction. Assurance methods such as formal
+methods [7], or reliability analysis [8] seek to provide either
+certain or probabilistic guarantees on system performance.
+Formal methods support verification by exhaustively search
+and identifying dangerous regions of the state space and
+provide techniques to avoid such states. Reliability analysis
+supports test and evaluation by quantifying the probability
+a system will be operational at a point in time from operational data collected throughout the systems lifecycle. The
+aforementioned state space explosion makes formal methods
+challenging to scale, and reliability analysis difficult to accurately predict estimates. A different field of research seeks
+to develop methods which explicitly consider safety during
+the learning and operational stages [9]. Lastly, investments
+such as the DARPA Assured Autonomy program1 seeks to
+continually assure learning enabled cyber-physical systems
+by constructing formal methods that assure correctness at
+design time and perform runtime monitoring at operation
+time. While this program has advanced the state of the
+
+lfiondella@umassd.edu
+2 Maggie Wigness is a researcher at the United States Army Research
+Laboratory (ARL).
+
+1 https://www.darpa.mil/program/assured-autonomy
+
+art in formal methods [10] and runtime monitoring [11], a
+systematic approach to identify outstanding gaps will remain
+unclear unless the community makes explicit and coordinated
+efforts to understand how such methods may be incorporated
+into the broader systems engineering process.
+Our work seeks to communicate recent technical developments in LEAS assurance with a focus on autonomous
+vehicles, accompanying recent literature reviews [12] [13], by
+mapping such developments to distinct steps of a well known
+systems engineering model chosen due to its prevalence,
+namely the v-model. Fig. 1 shows the mapping and identifies
+three top level lifecycle phases: development, acquisition, and
+sustainment. For each top level lifecycle phase, a section of
+the paper has been dedicated to outlining recent technical developments and how they contribute to the goals of the phase.
+This representation helps identify where the latest methods for
+TEVV fit in the broader systems engineering process while
+also enabling systematic consideration of potential sources of
+defects, faults, and attacks. Note that we use the v-model only
+to assist the classification of where TEVV methods fit. This is
+not a recommendation to use a certain software development
+lifecycle over another.
+The remainder of the paper is organized as follows. Section II outlines the specific scientific fields supporting LEAS.
+Section III provides an overview of the mapping between traditional systems engineering and the state of the art in assurance for LEAS. Section IV maps assurance techniques, which
+assist development to design and development, and system
+integration in the systems engineering lifecycle. Section V
+maps assurance techniques, which assist acquisition to test
+and evaluation. Section VI maps assurance techniques, which
+assist sustainment to transition, operation, & maintenance.
+Lastly, section VII concludes with areas this mapping can
+impact.
+II. M ETHODS S UPPORTING THE D EVELOPMENT OF
+L EARNING E NABLED AUTONOMOUS S YSTEMS
+This section seeks to define the fields of engineering
+with significant impact on development of LEAS with a
+focus on vehicles and their corresponding challenges for
+assurance. In later sections (Sec. IV—VI), solutions to such
+challenges are identified and categorized according to where
+they reside within the systems engineering lifecycle such as
+development, acquisition, or sustainment. Rather than seek to
+obtain an exhaustive list of engineering fields, of which there
+are many, we first provide an overview of learning enabled
+autonomous vehicles and then review two key contributing
+fields, including machine learning and reinforcement learning.
+While there are other non-learning methods such as optimal
+control theory [14], which have made large and long lasting
+impacts on the development on LEAS, they are not considered
+in this paper.
+LEAS normally follow one of two design approaches, endto-end (E2E) or modular. In the E2E approach [15], a system’s
+sensors act as the input to a learning algorithm. For example, a
+deep neural network outputs the corresponding actions such as
+
+steering wheel angle (lateral control) [16], torque (longitudinal control) [17], or both [18]. In the modular approach [19], a
+system’s sensors act as input to a perception sub-system which
+is responsible for building a map and model of the world.
+Such subsystems commonly include perception components
+that use ML techniques such as semantic segmentation [20] or
+object detection [21]. This model is then used by a planning
+subsystem, which outputs a kinematically feasible trajectory
+to which controls are applied [22], [23].
+While it may be possible to break down layers of E2E
+neural networks into sub-components using interpretability
+techniques [24], this paper specifically focuses on the modular
+approach for two reasons: i) it is clear to a human what the
+responsibility of each component is (increased interpretability), and ii) the modular approach is currently more common
+in autonomous vehicle designs in industry and government
+implementations. While some of the underlying problems for
+assurance are the same for both approaches, including those
+previously mentioned [4], we explicitly consider software
+assurance methods which are applicable to either perception
+or planning components, or the joint-combination thereof.
+A. Machine Learning
+In machine learning (ML), tasks are completed by training
+a model from data to perform function approximation using
+a combination of mathematical optimization and statistical
+techniques [25]. This results in computer programs which are
+able to complete a task without constructing a set of exact
+solution instructions ahead of time. There are three main
+forms of learning, including supervised, unsupervised, and
+reinforcement learning. In supervised learning, each training
+sample from the dataset is associated with a set of features and
+a corresponding label to train a model. For example, a neural
+network can be trained on a dataset of images containing
+handwritten digits, where each sample’s corresponding label
+is 0 through 9. In unsupervised learning, each training sample
+is only represented by a set of extracted features, which are
+subsequently used to identify the underlying feature patterns
+throughout the dataset. For example, clustering techniques
+divide a dataset into k distinct groups, where all data points
+in a group are similar with respect to some distance measure.
+Finally, in reinforcement learning, an autonomous agent learns
+the optimal way to act over time via interaction with the
+environment, such as an autonomous robot learning how to
+move its actuators and joints to navigate in an environment
+without hitting obstacles.
+Although the ability to perform complex tasks solely from
+data has made ML highly successful, it is for this same
+reason that ML models are difficult to assure. Among other
+factors, a model’s performance depends on the data experienced during training and the environment in which it was
+trained [26]. Naive metrics such as the model’s accuracy
+on a test set may be perceived as overconfident because
+they assume most future data will be like the experienced
+data. This is especially true in complex systems such as
+government systems tasked with operating in contested op-
+
+erational environments, demonstrating the need for metrics
+to assess model performance in new environments. Another
+assurance challenge includes determining relevant test cases
+given the state space explosion and curse of dimensionality
+problems, of which the Range Adversarial Planning Tool has
+been proposed [27]. Furthermore, such models are brittle to
+perturbations in input, which may come from sources such as,
+sensor noise or adversarial attacks [28]. Lastly, it is inevitable
+that such models will fail from time to time, and explanations
+of why they fail (interpretability techniques) and how to fail
+gracefully (resilience techniques) are also valuable. Although
+there are a variety of new assurance techniques [12] [13] that
+seek to alleviate such issues, a framework does not exist to
+assess their thoroughness and relative effectiveness.
+B. Reinforcement Learning
+Reinforcement learning (RL) is given a dedicated subsection because it is an enabler of intelligent-like capabilities
+required for complex autonomous systems. Reinforcement
+learning provides a framework for autonomous agents to make
+decisions under uncertainty and learn from environmental
+interaction [29]. Specified by a reward function, an agent
+seeks to obtain an optimal policy which maximizes its reward
+by taking actions over a time horizon in an environment. A
+policy is a function that maps the current state to the single
+action that maximizes the expected future reward. Formally,
+this structure is part of a Markov Decision Process (MDP)
+consisting of a state space S, an action space A, a state
+transition distribution over next states T (st+1 |st , a), and a
+reward function R(s, a, s0 ) whose solution is the optimal
+policy which maximizes the expected future reward π ∗ . Exact
+RL seeks to converge to the optimal policy using tabular
+techniques, requiring an agent to visit each state many times.
+Conversely, approximate techniques such as deep RL [30]
+allow an agent to operate in large (possibly infinite) state
+and action spaces without explicitly visiting each state by
+obtaining a parameterized policy.
+Although RL has demonstrated its ability to mimic intelligent capabilities such as beating players at Go [31], and
+autonomous driving [32], there are limitations. Designing
+reward functions explicitly by hand is a challenging task
+that can lead to a misalignment between the reward function
+specified and the true reward function the algorithm designer
+intended [33]. Such value misalignment leads to unintended
+consequences such as reward hacking [34], where the robot
+maximizes reward in a way that the algorithm designer did
+not intend while often failing to meet its goals. Furthermore,
+many solutions sample inefficiently and are often brittle [35],
+limiting their real world applicability. Lastly, RL can cause
+a disconnect between how a programmer may interpret what
+an agent has learned and the true learned concept [36]. For
+example, a programmer may believe an agent has learned to
+traverse to a goal grid cell, but because of the environment
+setup, the agent may have actually simply learned to traverse
+to a green grid cell. For systems incorporating RL, such limi-
+
+tations and corresponding tests for each should be considered
+explicitly in the assurance process.
+III. OVERVIEW OF M APPING
+This paper provides a preliminary attempt to map recently
+developed technical approaches in the assurance and TEVV
+of learning enabled autonomous systems (LEAS) literature
+to a traditional systems engineering v-model. The mapping
+identifies three top level lifecycle phases: development, acquisition, and sustainment. Proceeding according to the colors
+in Fig. 1, the stages surrounded in the black box, including
+system design & development, and system integration, assist
+development and therefore are mapped to methods which
+explicitly provide safety assurance during the learning process
+(Sec. IV). The stage in the green box, test and evaluation,
+assists the acquisition of systems and therefore is mapped to
+TEVV analysis techniques which quantify the performance
+of an already built system, or component (Sec. V). The stage
+in the orange box, transition operation & maintenance, is
+mapped to safety assurance techniques which aid sustainment
+by monitoring or adapt performance of a fielded system
+(Sec. VI). For each stage, applicable classes of techniques
+are organized by respective subsections.
+In addition to the stage of the system engineering lifecycle,
+this mapping also seeks to categorize technical developments
+according to their granularity. When evaluating different approaches to the same problem, the choice of performance
+metrics depend on the scope of the unit under test—whole
+system, learning enabled component, or a traditional component. Interfaces at various lifecycle levels of granularity
+promote systems thinking [37] about architecture. Namely, the
+way a system’s components and subsystems relate, interact,
+and work over time. By understanding the input paths that
+contribute to a unit’s decisions, the outputs that may lead to
+failures within the larger system become clearer.
+Generally speaking, there are two main approaches to assure LEAS—white-box techniques and black-box techniques.
+White-box techniques require either a model of the system
+under test, or direct access to the source code. In contrast,
+black-box techniques only look at the inputs and outputs of
+the system under test, and are unaware of the underlying
+methods of how the system generates the outputs. Whitebox techniques are better for component level assurance,
+while black-box techniques are often better for system-wide
+assurance.
+The implementation of assurance techniques and their
+accompanying metrics to quantify system performance and
+safety (Sec. IV—Sec. VI) can all be used as supporting
+evidence for a safety assurance case [38] to determine system
+readiness level and maturity. Tools which automate traceability and reproducibility throughout the system lifecycle
+such as [39] can reduce the burden of collecting evidence.
+The appropriate choice of assurance methods and associated
+metrics is dependent on the system maturity. Initial project
+milestones may focus on demonstrating anti-fragility, while
+later milestones may focus on demonstrating the ability to
+
+accomplish a mission and accompanying capabilities. Furthermore, quantitative metrics may only be applicable at
+certain levels of system granularity. For example, an entire
+system may be best evaluated by the outcomes of a predetermined mission and supporting data, while a learning
+enabled component may be better evaluated by measures
+specific to machine learning such as uncertainty quantification, robustness to environmental shift, and the ability to fail
+gracefully and recover from faults. Metrics which are able
+to capture the performance of all approaches under test may
+be preferred over metrics that measure the performance of a
+certain class of algorithms. Lastly, if performance data can
+be collected during the development process, one could also
+perform a quantitative analysis of a system at any given time
+using traditional reliability [8] and defect removal [40].
+IV. A SSURANCE ACTIVITIES TO S UPPORT S YSTEM
+D EVELOPMENT
+This section maps assurance methods which assist development to system design and development, and system
+integration in the systems engineering lifecycle.
+A. Artificial Intelligence Safety
+AI safety is a sub-field of AI which seeks to ensure that a
+deployed AI systems (i) operates as the designer intended
+and (ii) completes its task without harming humans. The
+importance of AI safety is backed by impactful institutions
+such as the Future of Life Institute2 and Machine Intelligence
+Research Institute3 . In the academic literature, AI safety
+has been popularized by the agenda of Amodedi et al. [9],
+who discuss five failure modes for AI; negative side effects,
+reward hacking, scalable supervision, safe exploration, and
+distributional shift. Moreover, in the context of RL, the
+value alignment problem arises due to a gap in the specified
+reward function and what the human actually intended [41].
+Specifically, Taylor et al. [42] discuss eight different approaches focusing on two areas of value alignment—reward
+specification and techniques to avoid side effects. Burden et
+al. [43] argue that the scope of AI safety problems residing
+in a specific system can be characterized by three quantitative
+factors; generality, capability, and control. For a literature
+review of AI safety, the reader is directed to [44].
+While the works above seek to obtain safer agents by
+altering the underlying methodologies, the focus is on agents
+in artificial environments rather than physical robots, thereby
+creating a gap between theoretical and applied research.
+Moreover, most approaches assume that the system is following a RL paradigm, demonstrating the importance to
+understand the underlying learning paradigm employed by a
+project. Lastly, although AI safety approaches alone will not
+be sufficient for LEAS assurance, if the methods are applied
+during the learning process, such approaches are likely to
+perform and test better than their non-safe counterparts,
+leading to higher assurance measures.
+2 https://futureoflife.org/
+3 https://intelligence.org/
+
+B. Learning from Human Feedback
+Incorporating human interaction can positively impact the
+performance of a LEAS because it is often easier to provide
+feedback on desired behavior rather than explicitly defining it.
+This is one solution to the value alignment problem mentioned
+in Sec. IV-A. Such human interaction may include learning
+from demonstration, intervention, or evaluation [45]. In learning from demonstration [46], the human provides a dataset
+of examples mimicking how the system should operate. In
+learning from intervention [47], the system operates fully
+autonomously and the human takes over as required to correct
+system behavior. In learning from human evaluation [48],
+[49], the system completes various tasks fully autonomously,
+and then a human ranks the tasks. This ranking may be
+from best to worst, or answering the yes/no question, “Was
+this the behavior you wanted to see the system perform?”
+All of the methods mentioned fall into a sub-field known
+as imitation learning [50]. Lastly, recent developments in
+imitation learning attempt to incorporate safety as part of the
+learning process using uncertainty quantification, creating a
+new sub field known as safe imitation learning [51], [52].
+C. Uncertainty Estimation
+System requirements often demand that a learning enabled autonomous system make a prediction, classification,
+or decision at every time-step during operation. Since many
+implementations contain perception systems that will likely
+never be 100% accurate, the certainty or lack thereof, of a
+prediction may assist in the final decision made—especially if
+the outcome of such a prediction may lead to risky behavior.
+The ability for a system to measure what it does and does
+not know can be captured by quantifying uncertainty with
+Bayesian analysis techniques [53]. There are two main types
+of uncertainty, aleatoric and epistemic. Aleatoric uncertainty
+measures the variance between samples in a population.
+This type of uncertainty cannot be reduced with more data.
+An example is the outcome of a fair coin flip. Epistemic
+uncertainty measures the lack of knowledge of a population,
+which is often captured in a system’s parameters. This type
+of uncertainty can be alleviated by collecting more data.
+An understanding of the different types of uncertainty helps
+system designers understand if performance can be increased
+by simply collecting more data. Additional details can be
+found in the reviews on uncertainty quantification applied to
+machine learning [54], neural networks [55], and computer
+vision [56]. Such techniques aid at the learning enabled component level, and can be used to quantify system confidence in
+the current operational environment and thereby communicate
+uncertainty (risk) to the system end users.
+D. Cost-sensitive Learning
+At the system level, the impact of a learning enabled
+component on the whole system is measured in terms of
+its ability to assist in the completion of a task. Additional
+failure modes introduced by such components must be explicitly considered. Cost-sensitive learning [57] is applicable
+
+in classification problems where the cost associated with the
+misclassification is not equal among classes. For example,
+in the context of commercial autonomous vehicles, a false
+positive resulting in the vehicle stopping when it did not need
+to likely has lower cost than a false negative resulting in a
+vehicle colliding with a pedestrian.
+E. Formal Methods
+Static analysis techniques such as formal methods are able
+to provide guarantees on system performance without ever
+operating the system [58]. Rather than attempting to discover
+faults while the system is placed under operation, claims about
+a system are proved or disproved algorithmically using rigorous mathematical methods. Such methods develop a model
+of the system being tested, such as a finite-state automaton,
+and then test that model against a set of specifications defined
+in a formal language. There are two main approaches, formal
+verification [7], which checks if a given system satisfies a set
+of specifications, while program synthesis seeks to construct a
+system from a set of specifications [59]. For a literature review
+of formal methods in the context of autonomous robotics, the
+reader is directed to [60].
+In the context of LEAS, the system is often complex
+and safety is critical, thereby making formal methods an
+attractive solution. Specifically, synthesis methods provide a
+“correct-by-construction” approach [61], where capabilities
+and required operating conditions such as safety constraints
+are described as specifications and act as input to a synthesis
+algorithm which outputs the appropriate system model and
+optimal control policy. The vehicle’s actions are thereby guaranteed to stay within the operating conditions determined by
+the obtained policy. However, many approaches are currently
+limited to static environments, meaning a robot which is
+guaranteed to satisfy the specifications in one environment
+does not necessarily carry over to other environments. Moreover, many formal methods have issues scaling to large state
+spaces [62] due to their exhaustive nature. However, solutions
+have been proposed using clever optimization techniques such
+as [63] [64]. Nevertheless, synthesis methods can be used
+to assure safety during a systems development phase, while
+formal verification techniques such as model checking [7]
+may be more applicable at the acquirement level.
+V. A SSURANCE ACTIVITIES TO S UPPORT S YSTEM
+ACQUISITION
+This section maps assurance activities to support system
+acquisition to test and evaluation in the systems engineering
+lifecycle.
+A. Autonomy Standards
+Standards seek to provide safety assurances, verify capabilities, and promote understanding. Several standards have
+been developed to assist the design and development of
+commercial autonomous vehicles such as ISO 26262 [65] and
+IEC 61508 [66]. Specifically, UL 4600 [67] and ISO/PAS
+
+21448 [68] explicitly consider autonomous vehicle capabilities incorporating learning. UL 4600 employs the idea of
+safety assurance cases, where system performance is argued
+like a court case given evidence. Minimizing risk is the
+goal while also accepting that it cannot be eliminated all together. Military focused standards include ALFUS [69] paired
+with the updated ARP6128 [70], and MIL-STD-882E [71].
+Most recently, IEEE 2817 [72] (in development) seeks to
+standardize verification methods specifically for autonomous
+systems. Although this discussion is part of the development
+subsection, the standards listed here may also be applicable
+to the other two lifecycle categories identified in Figure 1.
+B. Software Testing
+Capabilities of autonomous systems are enabled by software. There is no debate on the importance of software
+testing, when acknowledging the severity of historic software
+failures such as the patriot missile or Boeing 737 MAX.
+Traditional methods such as those outlined in [73] seek
+to partition the input space using graph or logic coverage
+to exhaustively test a program. While traditional methods
+may work for testing traditional software systems, exhaustive
+methods are rendered infeasible due to the state space explosion problem. Moreover, for statistical learning algorithms
+commonly applied in machine learning methods, the set of
+all possible samples is often much larger than the number
+of samples collected. For example, the set of all possible
+images a camera may sense using the RGB spectrum with
+an image size of 256 × 256 is 16, 777, 216(256∗256) . This
+demonstrates the importance of analyzing dataset features
+and their associated effectiveness [74] to obtain a generalized
+model.
+In regards to software engineering—a machine learning
+model is similar to traditional components, they both have
+inputs and outputs. The difference is the size of the input
+space and that the outputs may change on the same input at
+different points in time if the model is continually learning.
+However, if the model is not learning from new data, it can
+be considered as a deterministic component. An inaccurate
+prediction from a model can be thought of as equivalent to
+a software fault [75]. However, due to the large state space,
+the issue remains in the detection of such faults. The next
+subsection that follows seek to identify such faults.
+C. Automated Test Generation
+Automated test case generation seeks to increase the effectiveness of test and evaluation by minimizing testing time,
+and identifying the most impactful test cases which are likely
+to contain faults. A survey of automatic test-case generation
+[76] identifies five main categories—structural testing, modelbased testing, combinatorial testing, random testing, and
+search-based testing. Aforementioned for LEAS, the number
+of configurations is often intractable and therefore exhaustive
+or tree methods are infeasible. Search-based methods seek to
+alleviate this issue by using clever optimization techniques,
+which identify test cases in areas (boundaries) of a systems
+
+configuration space that are likely to lead to system failure.
+Therefore, this subsection focuses on search-based methods.
+
+VI. A SSURANCE ACTIVITIES TO S UPPORT S YSTEM
+S USTAINMENT
+
+Most relevant to LEAS, Mullins et al. [27] provide a tool
+which automatically identifies test cases for a system under
+test with a search based optimization approach dependent on
+a set of mission scenario configurations and a performance
+score for each configuration. A case study using the aforementioned tool in an autonomous surface vessel domain can
+be found in [77]. Bridging the gap between formal verification
+and automated test case generation, Akellea et al. [78] provide
+a black-box method to identify test cases which do not satisfy
+a provided temporal logic specification based on a dataset of
+observed demonstrations. Most recently, Badithela et al. [79]
+identify test cases for mission objectives by constructing a
+set of constraints given a user-defined sequence of waypoints
+and a reachability objective. In conclusion, recent research in
+search-based automated test generation is able to handle the
+state space explosion problem, while also finding the most
+impactful test cases. The results from such test cases help
+provide impactful evidence towards, or against the construction of safety case (UL 4600).
+
+This section maps assurance activities which support system sustainment to transition, operating, and maintenance in
+the systems engineering lifecycle.
+
+D. Metrics for Machine Learning
+
+B. Resilience Engineering
+
+Metrics provide a quantitative analysis of performance,
+clearly identifying the best solution out of a set of possible
+solutions. Performance is best measured by the system’s ability to accurately make predictions in the current operational
+environment which positively contribute to the larger mission
+goals. Initial metrics in supervised machine learning focused
+on confusion matrices and receiver operating characteristics
+(ROC) with metrics such as accuracy, sensitivity, specificity,
+precision, and F1 score. For regression models, statistical
+measures such as mean absolute error or mean squared error
+were sufficient. In the context of neural network regression,
+the statistical significance of input features and an accompanying statistical test may be identified [80]. In the reinforcement
+learning framework, Chan et al. [81] provide a set of test and
+evaluation metrics to statistically measure the variability and
+risk of RL algorithms both during and after training.
+Agnostic to the task (classification, regression, clustering,
+etc.), neuron coverage was introduced [82], as a testing metric
+analogous to code coverage [83] for traditional systems. Code
+coverage measures the percentage of a code base that has been
+covered by tests. High code coverage implies that few software bugs remain, and vice versa. Similarly, neural coverage
+measures the percentage neuron activations occur from the
+testing dataset, seeking to obtain the same implications of
+code coverage. However, recent research [84] [85] has shown
+that neuron coverage is an insufficient metric for testing.
+Wang et al. [86] seek to address this limitation by quantifying
+the value of a test set. Addition metrics research is needed to
+quantitatively measure the assurance problems outlined in [4].
+
+A. Runtime Monitoring
+Runtime monitoring observes the current state of a system
+and determines if the system is satisfying or violating a set
+of pre-determined specifications. This is similar to the formal
+methods approach outlined in Sec. IV-E. However, runtime
+monitoring occurs online (while the system is operating),
+whereas most techniques from formal methods occur offline.
+Kane et al. introduced EgMon [87], which detects the violation of specifications using propositional metric temporal
+logic. Similarly, Zapridou et al. [88] develop an adaptive
+cruise control system in the CARLA simulator and perform
+runtime monitoring using signal temporal logic. Yel et al. [89]
+provide a runtime monitoring technique using neural networks
+for safe motion planning. In the U.S. government sector,
+a Boeing team as part of the DARPA assured autonomy
+program, implemented runtime monitoring in a flight simulator [11]. For an overview of runtime monitoring techniques,
+the reader is directed to [90].
+
+Resilience engineering techniques seek to build systems
+which remain operational subject to faults and disturbances [91]. Such techniques quantify the impact of degraded
+performance and robustness to faults while providing predictions such as the expected time until recovery [92]. In the context of LEAS, resilience techniques can accommodate sensor
+inaccuracies which may come from measurement limitations
+in the hardware, dust or debris, and adversarial attacks [28].
+Resilience monitoring enables a system to recognize that
+performance is degraded, and then adapt appropriately, such
+as moving from perception based navigation to odometry
+based navigation. At the time of writing there is little technical
+research on the incorporation of resilience techniques to
+LEAS [93], However, [94] offers an initial taxonomy on
+resilience for multi-robot systems.
+VII. C ONCLUSION
+This paper provides preliminary attempt to map recently
+developed technical approaches for the assurance of LEAS
+to a traditional systems engineering v-model. By doing so,
+we seek to improve the acquisition process by: (i) informing
+comprehensive assurance planning, (ii) promoting detailed
+analysis of alternatives, and (iii) objectively communicating
+risk to leaders. As indicated by the number of references in
+each section, most research has been done in the development
+of methods which explicitly consider safety assurance, while
+further research is needed in methods which aid the acquirement, and sustainment of such systems. Future work seeks
+to perform a case study assuring a LEAS using some of the
+methodologies referenced in this paper.

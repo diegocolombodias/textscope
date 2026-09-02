@@ -1,0 +1,3730 @@
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+B Y M OÏSE B LANCHARD* S TEVE H ANNEKE† , PATRICK JAILLET‡
+* Massachusetts Institute of Technology, moiseb@mit.edu
+† Purdue University, steve.hanneke@gmail.com
+
+‡ Massachusetts Institute of Technology, jaillet@mit.edu
+
+We consider the contextual bandit problem on general action and context
+spaces, where the learner’s rewards depend on their selected actions and an
+observable context. This generalizes the standard multi-armed bandit to the
+case where side information is available, e.g., patients’ records or customers’
+history, which allows for personalized treatment. We focus on consistency—
+vanishing regret compared to the optimal policy—and show that for large
+classes of non-i.i.d. contexts, consistency can be achieved regardless of the
+time-invariant reward mechanism, a property known as universal consistency.
+Precisely, we first give necessary and sufficient conditions on the contextgenerating process for universal consistency to be possible. Second, we show
+that there always exists an algorithm that guarantees universal consistency
+whenever this is achievable, called an optimistically universal learning rule.
+Interestingly, for finite action spaces, learnable processes for universal learning are exactly the same as in the full-feedback setting of supervised learning, previously studied in the literature. In other words, learning can be performed with partial feedback without any generalization cost. The algorithms
+balance a trade-off between generalization (similar to structural risk minimization) and personalization (tailoring actions to specific contexts). Lastly,
+we consider the case of added continuity assumptions on rewards and show
+that these lead to universal consistency for significantly larger classes of datagenerating processes.
+
+1. Introduction. The contextual bandits setting is one of the core important problems in
+sequential statistical decision-making. Abstractly, in the contextual bandit setting, a learner
+(or decision maker) interacts with a reward mechanism iteratively. At each iteration, the
+learner observes a context (or covariate vector) x ∈ X and selects an arm (or action) a ∈ A
+to perform; it then receives a (potentially stochastic) reward depending on the context and
+selected action. For example, a store may serve a sequence of customers, and for each provide a list of product recommendations, and receive reward if the recommendation leads to
+a purchase. The key distinctions between the contextual bandit setting and standard supervised learning (or regression) are that (1) the learner’s objective is to obtain a near-maximum
+average reward over time (rather than merely estimating the reward conditional means), and
+(2) the learner only observes the reward corresponding to the arm it chose. These aspects
+introduce a fundamental trade-off between exploration and exploitation: that is, while some
+arms may have high estimated reward values, other arms may have higher uncertainty in their
+rewards: in particular, uncertainty about whether they would yield an even higher reward, so
+that selecting that arm may provide information about the potential for higher future rewards.
+1.1. Universal Consistency. In the contextual bandit setting, a learner is consistent if
+its average reward converges to the maximum-possible average reward obtained with an
+optimal policy. Naturally, one would aim for learning procedures that ensure consistency
+for a broad class of problem instances. In particular, we are interested in universal consistency which asks that a learning rule achieves consistency for any underlying reward mechanism and as a by-product, any optimal policy. The equivalent notion can be defined for the
+2
+
+BLANCHARD, HANNEKE, AND JAILLET
+
+full-information case: for a stream of data (X, Y) = (Xt , Yt )t≥1 of instances modeled as a
+stochastic process on X × Y , a learning rule with predictions Ŷt is consistent if it has vanishing
+excess error compared to any fixed measurable predictor function f : X → Y , i.e.,
+1 PT
+t=1 ℓ(Ŷt , Yt ) − ℓ(f (Xt ), Yt ) → 0 (a.s.). Then, an algorithm is universally consistent if it
+T
+is consistent irrespective of the generating process for the values Y from the instances X. In
+this standard full-feedback setting, there are many works establishing universal consistency,
+beginning with the seminal work of [39] who proved universal consistency for a broad family
+of local average estimators. Later works extended these results, to guarantee strong universal
+consistency (i.e., almost sure convergence), other categories of learning rules, more general
+conditions on the metric space X , and more general loss functions [12, 17]. More recently,
+[23, 19, 11] gave minimal assumptions on the space X for universal consistency—essentiallyseparable metric spaces. All of these works were restricted to i.i.d. data (Xt , Yt )t≥1 sampled
+from a joint distribution on X × Y . Some of these results aimed to relax the i.i.d. assumption
+by considering non-i.i.d. mixing, stationary ergodic data generating processes [29, 18, 17] or
+satisfying the law of large numbers [28, 14, 38].
+1.2. Optimistically universal learning. In the present work we pursue a theory of universal consistency under provably-minimal assumptions on the sequence of contexts. This
+type of theory falls into a framework known as optimistically universal learning, introduced
+by [20], that can be succinctly summarized as “learning whenever learning is possible”. The
+idea is to identify the minimal assumption on the data sequence sufficient for universal consistency to be possible. Such an assumption is then both necessary and sufficient, and therefore
+amounts to merely assuming that universally consistent learning is possible: aptly named the
+optimist’s assumption. For any given process X satisfying this minimal assumption, by definition there must exist a universally consistent learning rule. However, the interesting question
+becomes whether the optimist’s assumption alone is sufficient to guarantee universal consistency for some well-designed learning rule: that is, whether there exists a single learning rule
+that is universally consistent for every process X satisfying the optimist’s assumption. Such
+a learning rule is said to be optimistically universal.
+1.3. Optimistically universal learning with full-feedback. The first general analysis of
+optimistically universal learning and provably-minimal assumptions for universal consistency in the full-feedback setting was introduced by [20]. He provided general necessary
+and sufficient conditions for the existence of universally consistent learning rules for inductive learning—where one can only observe a finite amount of data (Xt , Yt )t≤n before
+committing to a prediction rule for the future steps T ≥ n— and for a slight variation called
+self-adaptive learning—where the learner only observes a finite amount of values (Xt , Yt )t≤n
+but can continue to update its predictions from the testing observations Xn+1 , . . . , XT , that
+is it continues to learn from test data. Interestingly, while there do not exist optimistically
+universal inductive learning rules, there do exist explicitly defined optimistically universal
+self-adaptive learning rules. That work focused mostly on the noiseless function learning setting where some unknown function f ∗ : X → Y defines the values exactly via Yt = f (Xt ). It
+also left open the question of characterizing universal learning for the standard online learning framework, in which the learner can update its predictions from the complete available
+test and value data (Xt , Yt )t≤T [see also 21].
+Addressing the online learning problem, in the noiseless setting, [6] provided a simpler
+characterization and algorithm for unbounded losses while [4, 5] provided a solution for
+the main case of interest of bounded losses. In particular, while the nearest neighbor algorithm may not be universally consistent even for i.i.d. data [9], for noiseless responses, a
+simple variant with restricted memory is optimistically universal [4]. For the generic case of
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+noisy responses, [22] showed that universal learning can be achieved even for arbitrarily dependent responses on large classes of processes. The complete characterization of universal
+online learning with noise was given in [7], showing that under mild conditions on the value
+space—including totally-bounded metric spaces—optimistically universal learning is possible for arbitrary or adversarial responses without generalizability cost compared to noiseless
+responses.
+1.4. Universal learning with partial feedback. The contextual-bandit formulation was
+first introduced for one-armed bandits [43, 35] in a rather restricted setting. Since then,
+progress has been made in the literature investigating stochastic contextual bandits under
+parametric assumptions [42, 24, 13, 8, 1, 32]. In the non-parametric setting, significant advances have been made to obtain minimax guarantees under smoothness conditions (e.g. Lipschitz) and margin assumptions [26, 34, 36, 31] with recent refinements including [16, 33].
+However, to the best of our knowledge, there are no prior works establishing universal
+consistency even under all i.i.d. data sequences, i.e., consistency in the non-parametric setting
+without further assumptions. As such, the present work is also the first to propose such results
+and corresponding universally consistent learning rules. Closest to this work is the result
+from [45] which shows that if rewards are continuous in the contexts, strong consistency
+can be achieved with familiar non-parametric methods, for Euclidean context spaces. This
+work significantly generalizes this result to unrestricted reward mechanisms, separable metric
+action and context spaces, and non-i.i.d. data.
+Non-i.i.d. data has also been widely studied in the literature. Most relevant to our work are
+non-i.i.d. generating processes for contexts. Examples include customers’ profile distribution, which may change depending on seasonal patterns, or the extension of clinical trials to
+new populations. In these cases, the distribution of contexts x changes while the underlying
+conditional distribution remains unchanged, a phenomenon known as covariate-shift. Such
+formalism was adopted in works on domain adaptation for classification [40, 15, 2]. Moreover, several works have also considered distributional shifts in both contexts and responses
+for bandit problems, in both parametric [3, 27, 44, 10] and non-parametric settings [41].
+1.5. Summary of the present work. In the present work we study optimistically universal
+learning in a partially-supervised setting: namely, standard contextual bandits [37, 25] with
+stationary reward functions. Precisely, there exists a time-invariant conditional probability
+distribution Pr|a,x such that the reward rt at each iteration is sampled according to the distribution Pr|a=at ,x=Xt where at (resp. Xt ) denotes the selected action (resp. observed context)
+at time t, independently from the past history. We are interested in online learning, where the
+learner may observe all past rewards rt′ and contexts Xt′ , t′ P
+< t, when choosing its action
+at given the context Xt . We aim to achieve average reward T1 Tt=1 rt that is (almost surely)
+competitive with any fixed policy X → A as T → ∞.
+1.5.1. Bounded unrestricted rewards. We first focus on the classical assumption that rewards are bounded. We show there always exists an optimistically universal learning rule.
+Our approach to proving this is to first characterize which processes X admit universally
+consistent learning rules, and then use this characterization to inform the design and analysis
+of a learning rule, which will be universally consistent under every such process. However,
+this approach turns out to require three separate cases: namely, A finite, A countably infinite,
+and A uncountably infinite. Each of these cases gives rise to a different characterization of
+the set of processes X under which universally consistent learning is possible for contextual
+bandits, a fact which itself is of independent interest. Moreover, each of these sets of processes corresponds to known families of processes from the past literature on optimistically
+BLANCHARD, HANNEKE, AND JAILLET
+
+universal learning. When A is finite, the set of processes admitting universal consistency for
+contextual bandits is equivalent to the family of processes admitting universally consistent
+online learning with full supervision: a family known as C2 . While this fact appears natural,
+interestingly this is not the case when A is countably infinite. In that case, the set of processes
+admitting universal learning for contextual bandits is equivalent to the family of processes admitting universally consistent inductive learning with full supervision: a family known as C1 ,
+which is more restrictive than C2 . Finally, when A is uncountably infinite, universal learning
+can never be achieved.
+1.5.2. Bounded rewards under continuity assumptions. For unrestricted rewards, although large classes of non-i.i.d. processes (C1 or C2 ) admit universal learning for countable
+action spaces, the answer for uncountable action spaces was very negative: universal consistency could never be achieved. However, we show that under continuity assumptions on the
+rewards, one can recover positive results for general action spaces. Further, in all cases, we
+provide optimistically universal learning rules. First, under the assumption that rewards are
+continuous, the characterization of processes admitting universal consistency now requires
+only two cases. If the action space is finite, the set of processes admitting universal learning remains unchanged and is C2 . On the other hand, if the action space is infinite, this set
+becomes C1 , irrespective of whether the action space was countably or uncountably infinite.
+Second, we consider a stronger assumption of uniform continuity on the rewards, in which
+the modulus of continuity of the expected reward in the actions r̄(·, x) for x ∈ X are uniform over the context space X . Under this assumption, universal learning under the more
+general set of processes C2 becomes possible for a significantly larger class of action spaces,
+namely totally-bounded action spaces. Otherwise, universal learning is achievable exactly on
+C1 processes.
+1.5.3. Unbounded rewards. Last, we consider the most general case of unbounded rewards. It is known that the family of processes admitting universal consistency with full
+supervision and unbounded losses is very restrictive. These are processes visiting only a finite number of distinct instances in X , known as C3 . For contextual bandits, in the standard
+case of unrestricted rewards, we show that there is a simple dichotomy: if the action space
+is countable then the set of processes admitting universal learning is still C3 ; however, if
+the action space is uncountably infinite, universal learning can never be achieved. Nevertheless, under continuity assumptions on the rewards, universal learning can always be achieved
+under C3 processes. Again, we give optimistically universal learning rules for all cases.
+1.6. Overview of probability-theoretic contributions. In this work, we make use of the
+conditions C1 , C2 , and C3 on stochastic processes from the universal learning literature to
+characterize the set of processes admitting universal learning. Along the way to establishing
+these results, another significant contribution of this work is establishing new equivalent characterizations of the families C1 and C2 , crucial for the design of our optimistically universal
+algorithms. In particular, we establish a new connection between these two families: proving
+that C2 can essentially be characterized by processes that would be in C1 if we were to replace
+duplicate values in the sequence X by some default value x0 . As a result, C2 processes differ
+from C1 processes only through duplicates: if a process X is guaranteed to almost never visit
+exactly the same context (e.g. i.i.d. processes with density) the properties C1 and C2 are equivalent. This fact has further interesting implications, such as a new technique for the design
+of optimistically universal learning rules for online learning with full supervision; prior to
+this, only one approach was known to yield such learning rules, based on a modified nearest
+neighbor algorithm [4]. The new approach suggested in the present work is instead based on
+an explicit model selection technique, in the spirit of structural risk minimization, analogous
+to the optimistically universal self-adaptive learning technique developed by [20].
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+1.7. Overview of algorithmic techniques. We present an overview of the optimistically
+universal learning rule for finite action sets, Algorithm 5, which encompasses the main algorithmic innovation in this work. We use the property that C2 processes without duplicates
+satisfy the C1 property (Proposition 3.2) to separate times into two classes: points not appearing often recently and points which have many duplicates recently.
+1. For the points in the first category, which behave as C1 processes, we use an approach
+similar to structural risk minimization: we aim to achieve sublinear regret compared to a
+constructed countable set of policies that is empirically dense. To do so, we use a restarting
+technique introduced in [20]: we use classical bandit algorithms as a subroutine to achieve
+sublinear regret with respect to a fixed finite number of policies, and occasionally restart
+the bandit learner to gradually increase the number of competing policies considered.
+2. For the points in the second category, we use a completely different strategy. Intuitively,
+these correspond to instances with many duplicates in the recent past, hence it is advantageous to assign each frequent instance an independent bandit learner. In particular, this
+specific bandit learner is tailored to that point’s rewards only and completely disregards
+historical data from other points.
+Interestingly, we can interpret the general strategy as balancing a tradeoff between generalization and personalization. The first strategy aims to find a policy that performs well at
+an aggregate level for points with few duplicates. On the other hand, the algorithm performs
+pure personalization for specific points that have many recent repetitions. This schematic
+presentation hides many details. In particular, to obtain vanishing excess error compared to
+the optimal policy, the algorithm needs to balance the generalization/personalization tradeoff
+carefully, to obtain the required generalization property. In effect, we allow for a cap M of
+duplicates for each instance in the recent past to be treated with the generalization strategy,
+and adaptively increase this cap. To adaptively increase this cap, the algorithm occasionally
+uses “exploration” times to estimate the performance of each strategy, and decides to increase
+the cap based on these estimates. Last, in order to have decisions robust to non-stationarity
+in the sequence of contexts, the algorithm selects actions based on recent data: the learning
+procedure is broken down by periods that contain a given proportion of the past data, then
+this proportion adaptively decays to 0.
+1.8. Outline of the paper. The remainder of the paper is organized as follows. After
+giving the definitions and main results in Section 2, we provide in Section 3 new characterizations of stochastic process classes as well as base algorithms, used to construct our
+learning rules. With these tools, we study optimistic learning with bounded rewards for finite
+(Section 4), countably infinite (Section 5), and uncountable (Section 6) action sets. We then
+show that universal learning can be achieved on larger classes of processes under continuity
+assumptions on the rewards in Section 7. Last, in Section 8 we consider the more restrictive
+case of unbounded rewards.
+BLANCHARD, HANNEKE, AND JAILLET
+
+2. Preliminaries and main results.
+2.1. Formal setup and problem formulation. The goal of this paper is to study the general
+framework of contextual bandits in an online setting. Given a separable metrizable Borel
+context space (X , B) and a separable metrizable Borel action space A, the learner interacts
+with the contextual bandit at each iteration t ≥ 1 of the learning process in the following
+fashion. First, the learner observes a context Xt ∈ X , then selects an action ât ∈ A based
+on the past history only. As a result of the action, the learner receives a reward rt . We will
+suppose for the most part that the rewards are bounded rt ∈ [0, r̄] = R for some known r̄ ≥ 0.
+Hence, except for Section 8 in which we consider unbounded rewards, we will take without
+loss of generality r̄ = 1. Crucially, the learning rule can only use the past history, which is
+defined formally as follows.
+D EFINITION 2.1 (Learning rule). A learning rule is a sequence f· = (ft )t≥1 of possibly
+randomized measurable functions ft : X t−1 × Rt−1 × X → A. The action selected at time t
+by the learning rule is ât = ft ((Xs )s≤t−1 , (rs )s≤t−1 , Xt ).
+We suppose that the contexts are generated from a stochastic process X = (Xt )t∈N on X .
+Further, we assume that rewards are sampled from a distribution conditionally on the context
+and actions. Formally, we assume that there exists a time-invariant conditional distribution
+Pr|a,x such that the rewards (rt )t≥1 are conditionally independent given their respective selected action at and observed context xt , and follow this conditional distribution. Hence,
+iid.
+(rt | at , xt )t≥1 ∼ Pr|a,x . To emphasize the conditional dependence of rt on the actions and
+context, we denote rt (a, x) (resp. rt (a)) the reward at time t, had the selected action been
+a ∈ A and the observed context x ∈ X (resp. when the context at time t is clear). Further, by
+abuse of notation, we will refer to a reward mechanism r as a random variable r ∼ Pr|a,x .
+For instance, we use the notation r̄(a, x) = E[r | a, x] to denote the immediate expected reward for any a ∈ A and x ∈ X . When we investigate unbounded rewards in Section 8, we
+will assume that the random variable r(a, x) is integrable for any (a, x) ∈ A × X . We investigate three settings for the reward mechanism r : unrestricted, continuous, and uniformlycontinuous. For the two last settings, we suppose that A is a separable metric space with
+metric d. We formally define the two continuity assumptions below.
+D EFINITION 2.2. The reward mechanism r is continuous if for any x ∈ X , the immediate
+expected reward function r̄(·, x) : A → [0, 1] is continuous.
+The reward mechanism r is uniformly-continuous if for any ǫ > 0 there exists ∆(ǫ) > 0 with
+∀x ∈ X , ∀a, a′ ∈ A,
+
+d(a, a′ ) ≤ ∆(ǫ) ⇒ |r̄(a, x) − r̄(a′ , x)| ≤ ǫ.
+
+Our goal is to design algorithms that intuitively converge to the optimal policy π ∗ : X → A
+that selects for any context x ∈ X an optimal arm in arg maxa∈A r̄(a, x). Such an optimal
+policy π ∗ is well-defined for finite A; however, for infinite A, this may no longer exist (e.g.,
+if supa∈A r̄(a, x) is not attained). Thus, to be fully general, we instead ask that the regret of
+the algorithm be sublinear compared to any fixed measurable policy π ∗ : X → A. We are then
+interested in learning rules that are consistent irrespective of the unknown reward mechanism
+r , i.e., which intuitively converge to the (near-)optimal policy for all reward mechanisms. We
+follow the definitions from the universal learning literature for general processes as introduced in [20].
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+D EFINITION 2.3 (Consistence and universal consistency). Let X be a stochastic process
+on X , r be a reward mechanism, and f· be a learning rule. Denote by (ât )t≥1 its selected
+actions. We say that f· is consistent under X with rewards r if for any measurable policy
+π ∗ : X → A,
+T
+
+1X
+rt (π ∗ (Xt )) − rt (ât ) ≤ 0,
+T →∞ T
+
+limsup
+
+(a.s.).
+
+t=1
+
+We say that a learning rule is universally consistent if it is consistent under X for any reward
+mechanism r .
+Unfortunately, universal consistency is not always achievable. For example, on X = N, under the process X = (t)t≥1 , there does not exist any universally consistent learning rule even
+in the simplest framework of noiseless—realizable—online learning with full-feedback—
+when one observes not only the reward rt (ât ) but the complete vector (rt (a))a∈A at step t
+[20, 4]. Two natural questions then arise. First, when is universal consistency possible? And
+second, which algorithms are universally consistent for a large family of such stochastic processes? To this end, we introduce the notion of optimistically universal learning rules, that
+“learn whenever learning is possible”.
+D EFINITION 2.4 (Optimistically universal learning rule). Denote by C the set of processes X on X such that there exists a learning rule universally consistent under X.
+We say that a learning rule f· is optimistically universal if it is universally consistent under
+any process X ∈ C .
+Similarly, we define C c (resp. C uc ) the set of processes admitting universal learning under continuous (resp. uniformly-continuous) rewards, and define accordingly the notion of
+optimistically universal learning rule for continuous (resp. uniformly-continuous) rewards.
+In this paper, we answer the informal questions described above by 1. characterizing the set
+of learnable processes and 2. showing that there indeed exists and providing optimistically
+universal learning rules.
+2.2. Useful classes of stochastic processes. In this subsection we present the key conditions arising in the characterizations of processes on X admitting universal learning.
+Let us first start with some notation. For any stochastic process X = (Xt )t≥1 , we denote
+X≤t = (Xs )s≤t for any t ≥ 1. We also introduce the empirical limsup frequency µ̂X as follows,
+µ̂X (A) = limsup
+
+T
+X
+
+T →∞ t=1
+
+1A(Xt ), A ∈ B.
+
+The first condition asks that the set function E[µ̂X (·)] forms a continuous sub-measure.
+D EFINITION 2.5 (Condition 1 [20]).
+able subsets of X with Ak ↓ ∅,
+
+For every monotone sequence {Ak }∞
+k=1 of measur-
+
+lim E[µ̂X (Ak )] = 0.
+
+k→∞
+
+We define C1 as the set of processes X satisfying this condition.
+For our purposes, we will need to extend this definition to extended stochastic processes
+which may take values on a subset of possibly random times T ⊂ N instead of the complete
+set of times N. Overloading the notation C1 , we refer to the same condition C1 for extended
+stochastic processes which satisfy the equivalent condition.
+BLANCHARD, HANNEKE, AND JAILLET
+
+D EFINITION 2.6 (Extended condition 1). Given a possibly random set of times T ⊂ N,
+X̃ = (Xt )t∈T satisfies the following condition: for every monotone sequence of measurable
+sets of X with Ak ↓ ∅,
+
+
+X
+lim E limsup
+1Ak (Xt ) = 0.
+k→∞
+T →∞ T
+t≤T,t∈T
+
+As an important remark, the set of C1 extended stochastic processes is larger than the processes X̃ = (Xt )t∈T satisfying (Xti )i≥1 ∈ C1 where T = {t1 ≤ t2 ≤ . . .} is an enumeration
+of T . For instance, on X = N, the process (Xt = t)t≥1 does not belong to C1 —the decreasing sequence Ak = {n ≥ k} disproves the condition. However, for any increasing sequence
+of times tk = ω(k), the extended process X̃ = (Xt )t∈{tk ,k≥1} with Xtk = k for all k ≥ 1,
+belongs to C1 because |{tk ≤ T, k ≥ 1}| = o(T ).
+We then introduce a weaker condition on stochastic processes which asks that the process
+visits a sublinear number of sets from any measurable partition of X .
+D EFINITION 2.7 (Condition 2 [20]).
+subsets of X ,
+
+For every sequence {Ak }∞
+k=1 of disjoint measurable
+
+|{k : X≤T ∩ Ak 6= ∅}| = o(T ) (a.s.).
+
+Denote by C2 the set of all processes X satisfying this condition.
+It is known [20] that C1 ⊂ C2 and that i.i.d. processes, stationary ergodic processes, stationary processes
+P and processes satisfying the law of large numbers—for any A ∈ B , the limit
+limT →∞ T1 Tt=1 1A (Xt ) exists almost surely—belong to C1 . Therefore, both C1 and C2 are
+very general classes of processes.
+Last, we introduce a significantly stronger assumption asking that the process only visits
+a finite number of distinct points.
+D EFINITION 2.8 (Condition 3 [20, 6]).
+|{x : X ∩ {x} 6= ∅}| < ∞ (a.s.).
+
+Denote by C3 the set of all processes X satisfying this condition.
+2.3. Main results. We are now ready to present our main results. We show that the set
+of processes admitting universal learning C corresponds to one of the classes of processes
+C3 ⊂ C1 ⊂ C2 and depends only on the action set A. A summary of the charcaterizations is
+provided in Table 1. In addition, we always provide optimistically universal learning rules for
+each case, which we construct in the next sections. In the main setting of bounded rewards,
+the relevant alternatives are whether A is finite, countably infinite, or uncountable.
+T HEOREM 2.9 (Unrestricted bounded rewards).
+context space and A an action space.
+
+Let X be a separable metrizable Borel
+
+• If A is finite and |A| ≥ 2, then C = C2 .
+• If A is infinite and countable, then C = C1 .
+• If A is an uncountable separable metrizable Borel space, then C = ∅.
+
+In all cases there is an optimistically universal learning rule.
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+TABLE 1
+Characterization of learnable instance processes for universal learning in contextual bandits depending on
+properties of the action space A.
+Unrestricted rewards
+Bounded rewards
+
+Unbounded rewards
+
+Finite:
+C2
+Countably infinite: C1
+Uncountable:
+∅
+Countable:
+C3
+Uncountable:
+∅
+
+Continuous rewards
+Finite:
+Infinite:
+C3
+
+C2
+C1
+
+Uniformly-continuous
+rewards
+Totally-bounded:
+C2
+Non-totally-bounded: C1
+C3
+
+We recall that X ∈ C2 is necessary to achieve universal learning under X even in the
+simplest online learning setting with full-feedback and noiseless values [20, 4]. Therefore,
+Therorem 2.9 shows that universal consistence for contextual bandits is achievable for finite
+action sets at no extra generalizability cost. Unfortunately, in uncountable action spaces, universal consistence is not achievable. A natural question then becomes whether with additional
+mild assumptions on the rewards one can recover the large classes of processes C1 or C2 for
+universal learning. In particular, we assume that (A, d) is a separable metric space and first
+consider the case of continuous rewards. Under this first assumption, we show that we can
+achieve universal consistency on all C1 processes with an optimistically universal learning
+rule.
+T HEOREM 2.10 (Continuous bounded rewards). Let X be a separable metrizable Borel
+context space and (A, d) a separable metric action space.
+• If A is finite and |A| ≥ 2, then C c = C2 .
+• If A is infinite, then C c = C1 .
+In all cases there is an optimistically universal learning rule for continuous rewards.
+As a result, under the the continuity assumption, one recovers the set of processes C1
+for infinite action spaces. However, it is not sufficient to recover the largest set C2 which is
+necessary even in the noiseless full-feedback setting. To this ends, we consider the stronger
+assumption that rewards are uniformly-continuous and show that one can to recover the set
+of learnable processes C2 for totally-bounded action spaces.
+T HEOREM 2.11 (Uniformly-continuous bounded rewards). Let X be a separable metrizable Borel context space and (A, d) a separable metric action space.
+• If A is totally-bounded and |A| ≥ 2, then C uc = C2 .
+• If A is non-totally-bounded, then C uc = C1 .
+In all cases there is an optimistically universal learning rule for uniformly-continuous rewards.
+Last, we investigate the more restrictive case of unbounded rewards in R = [0, ∞). [5]
+showed that even in the simplest noiseless and full-feedback online learning framework, for
+unbounded rewards, C3 is necessary for universal learning. We show that although it forms
+a restrictive class of processes, universal learning under C3 processes is still possible for
+contextual bandits. However, continuity or uniform continuity assumptions are not sufficient
+to enlarge this set of learnable processes.
+T HEOREM 2.12 (Unbounded rewards). Let X be a separable metrizable Borel context
+space and (A, d) a separable metric action space.
+BLANCHARD, HANNEKE, AND JAILLET
+
+• If A is countable, and |A| ≥ 2, then C = C3 . If A is uncountable, then C = ∅.
+• C c = C uc = C3 .
+In all cases there is an optimistically universal learning rule for the corresponding rewards
+(unrestricted, continuous or uniformly-continuous).
+3. Base ingredients for the proofs and algorithms.
+3.1. Equivalent characterizations of stochastic process classes. We give new characterizations of the classes C1 and C2 of independent interest.
+We first show that for processes X ∈
+/ C1 , we can construct a measurable partition visited
+linearly by the process up to a known maximum number of duplicates in the instances for
+each set of the partition. This also characterizes C1 .
+L EMMA 3.1. For
+/ C1 , there exists a disjoint sequence {Bi }∞
+i=1 of measurable
+S any X ∈
+subsets of X with
+Bi = X , and a sequence Ni in N such that, letting it be the unique
+i∈N
+
+i ∈ N with Xt ∈ Bi , with probability strictly greater than zero, it holds that
+T
+
+1X
+1[|X<t ∩ Bit | < Nit ] > 0.
+T →∞ T
+
+limsup
+
+t=1
+
+In fact, X ∈
+/ C1 if and only if this holds.
+
+P ROOF. Suppose X ∈
+/ C1 . By Lemma 14 of [20], there exists a disjoint sequence {Bi }∞
+i=1
+of measurable subsets of X such that, on an event E0 of probability strictly great than 0, it
+holds that
+
+
+[
+lim µ̂X  Bi  > 0.
+j→∞
+
+i≥j
+
+Without loss of generality, we may suppose B1 = X \
+random variable α as
+
+
+
+α = lim µ̂X 
+j→∞
+
+[
+
+i≥j
+
+S
+
+Bi so that
+
+i>1
+
+S
+
+i∈N
+
+Bi = X . Define a
+
+
+
+Bi  .
+
+Inductively define sequences Tk , Jk in N as follows. Let T0 = 0 and J0 = 1. For each
+k ∈ N, suppose Tk−1 and Jk−1 are defined, elements of N, and define Tk and Jk as follows.
+Note that, by definition of µ̂X , there exists an X-dependent random variable τk ∈ N with
+τk > Tk−1 such that
+
+
+[
+[
+X≤τk ∩
+Bi ≥ (1/2)µ̂X 
+Bi  .
+τk
+i≥Jk−1
+
+i≥Jk−1
+
+Moreover, by monotonicity of µ̂X (·), the right hand side is no smaller than α/2. Let Tk ∈ N
+be any finite non-random value such that
+P(τk > Tk ) < P(E0 )2−k−2 .
+
+Next note that, since the sets Bi are disjoint, there exists a finite X-dependent random variable
+jk ∈ N with jk > Jk−1 such that
+[
+X≤Tk ∩
+Bi = ∅.
+i≥jk
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+Let Jk ∈ N be any finite non-random value such that
+
+P(jk > Jk ) < P(E0 )2−k−2 .
+
+In particular, on the event that jk ≤ Jk , it holds that
+[
+Bi = ∅,
+X≤Tk ∩
+i≥Jk
+
+which implies that
+
+X≤Tk ∩
+
+[
+
+i≥Jk−1
+
+Bi = X≤Tk ∩
+
+[
+
+Bi .
+
+Jk−1 ≤i<Jk
+
+Thus, if both events τk ≤ Tk and jk ≤ Jk hold, it must be that
+X≤τk ∩
+τk
+
+[
+
+Jk−1 ≤i<Jk
+
+Bi ≥ α/2,
+
+or equivalently,
+τ
+
+(1)
+
+k
+1 X
+1[it ∈ {Jk−1 ≤ i < Jk }] ≥ α/2.
+τk
+
+t=1
+
+This completes the inductive definition of the sequences Tk and Jk .
+To specify the Ni values,
+T for each k ∈ N and i ∈ {Jk−1 , . . . , Jk − 1}, define Ni = Tk . Note
+{τk ≤ Tk } ∩ {jk ≤ Jk } has probability at least
+that the event E1 = E0 ∩
+k∈N
+
+P(E0 ) −
+
+X
+
+P(E0 )2−k−1 = P(E0 )/2 > 0
+
+k∈N
+
+by the union bound. On the event E1 , (1) holds for every k ∈ N. Since τk ≤ Tk on E1 , we also
+trivially have that every i ∈ {Jk−1 , . . . , Jk − 1} and t ∈ [τk ] satisfy |X<t ∩ Bi | < t ≤ Tk = Ni .
+Together, these facts imply that on E1 , every k ∈ N satisfies
+τ
+
+k
+1 X
+1[|X<t ∩ Bit | < Nit ] ≥ α/2.
+τk
+
+t=1
+
+Since we also have α > 0 on the event E1 , and since Tk is strictly increasing, and τk > Tk−1
+implies τk → ∞ as k → ∞, altogether we have that on the event E1 ,
+T
+
+1X
+1[|X<t ∩ Bit | < Nit ]
+limsup
+T →∞ T
+t=1
+
+τ
+
+k
+1 X
+1[|X<t ∩ Bit | < Nit ] ≥ α/2 > 0.
+≥ limsup
+k→∞ τk
+
+t=1
+
+We establish the final claim that such a result is not possible for X ∈ C1 , as follows. Fix any
+X ∈ C1 . For any
+S disjoint sequence Bi of measurable subsets of X , and any sequence Ni ∈ N,
+define Cn = {Bi : Ni > n}, and note that Cn ↓ ∅. For every n ∈ N, we have
+T
+
+(2)
+
+1X
+1[|X<t ∩ Bit | < Nit ]
+T →∞ T
+
+limsup
+
+t=1
+BLANCHARD, HANNEKE, AND JAILLET
+T
+
+1X
+(1[|X<t ∩ Bit | < n] + 1[Nit > n])
+T →∞ T t=1
+!
+T
+1X
+1[|X<t ∩ Bit | < n] + µ̂X (Cn ) .
+≤ limsup
+T →∞ T
+≤ limsup
+
+t=1
+
+For any m ∈ N, any t ≥ m has 1[|X<t ∩ Bit | < n] ≤ 1[|X<m ∩ Bit | < n], so that
+T
+
+1X
+1[|X<t ∩ Bit | < n]
+limsup
+T →∞ T
+t=1
+
+T
+
+[
+m 1X
+{Bi : |X<m ∩ Bi | < n} .
+1[|X<m ∩ Bit | < n] = µ̂X
++
+T
+T →∞ T
+
+≤ limsup
+
+t=1
+
+Since the first expression above has no dependence on m, the conclusion remains valid in the
+limit of m → ∞, so that
+T
+
+[
+1X
+{Bi : |X<m ∩ Bi | < n} ,
+1[|X<t ∩ Bit | < n] ≤ lim µ̂X
+m→∞
+T →∞ T
+
+limsup
+
+t=1
+
+which equals zero almost surely (by Lemmas 13 and 14 of 20). Altogether, for any n ∈ N,
+with probability one, (2) is at most µ̂X (Cn ). Again, since (2) has no dependence on n, this
+inequality remains valid in the limit as n → ∞, so that with probability one, (2) is at most
+lim µ̂X (Cn ) ,
+
+n→∞
+
+which equals zero almost surely (by Lemma 13 of 20). The conclusion that (2) equals zero
+almost surely follows by the union bound.
+Next, we give a new characterization of C2 processes, which also provides motivation
+for our generalization of C1 to extended processes in Definition 2.6. This extension will be
+essential in our algorithms.
+P ROPOSITION 3.2.
+
+Let X be a stochastic process on X , and define for any M ≥ 1,
+
+
+
+
+X
+≤M
+′
+T
+= t≥1:
+1[Xt = Xt ] ≤ M ,
+
+
+′
+t ≤t
+
+the set of times which are duplicates of index at most M . In particular, T ≤1 is the set of times
+where we delete all duplicates. The following are equivalent.
+1. X ∈ C2 .
+2. (Xt )t∈T ≤1 ∈ C1 .
+3. For all M ≥ 1, (Xt )t∈T ≤M ∈ C1 .
+Essentially, the main difference between extended C1 and C2 processes lies in the multiple
+occurrences of instance points. In particular, if X never visits the same instance point twice
+almost surely, as is the case of i.i.d. process with densities, then X ∈ C1 if and only if X ∈ C2 .
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+
+P ROOF. We start by showing (2) ⇒ (1). Suppose that a process X is not in C2 . We aim
+to show that X disproves the second property. Because X ∈
+/ C2 , there exists a sequence of
+disjoint measurable sets (Bi )i≥1 , ǫ, δ > 0 such that with probability δ > 0
+|{i : X≤T ∩ Bi 6= ∅}|
+≥ ǫ.
+T
+T →∞
+S
+Denote by A this event, and consider the sets Ai = j≥i Bi for i ≥ 1. Now fix i ≥ 1. For any
+T ≥ 1, we have
+X
+1Ai (Xt ) = |Ai ∩ X≤T | ≥ |{j ≥ i : Bj ∩ X≤T 6= ∅}| ≥ |{j : X≤T ∩Bj 6= ∅}|−(i−1),
+limsup
+
+t≤T,t∈T ≤1
+
+where in the first inequality we used the fact that the Bj are disjointP
+for all j ≥ i, but included
+within Ai . As a result, on the event A we have limsupT →∞ T1 t≤T,t∈T ≤1 1Ai (Xt ) ≥ ǫ.
+Hence,
+
+
+X
+1Ai (Xt ) ≥ ǫP[A] = ǫδ.
+E limsup
+T →∞ T
+≤1
+t≤T,t∈T
+
+This holds for all i ≥ 1 but Ai ↓ ∅, which shows that X does not satisfy property (2).
+To prove (1) ⇒ (2), now suppose that property (2) is not satisfied by X. We aim to show
+that X ∈
+/ C2 . Then, there exists a sequence of measurable sets Ai ↓ ∅, ǫ > 0 and an increasing
+sequence of indices (ik )k≥1 such that for all k ≥ 1
+
+
+|Aik ∩ X≤T |
+E limsup
+≥ ǫ.
+T
+T →∞
+
+Because the sets Ai are decreasing and the quantity
+is increasing in
+i
+h within the expectation
+|Ai ∩X≤T |
+≥ ǫ. Therefore, for
+the set A, this shows that for all i ≥ 1, we have E limsupT →∞
+T
+h
+i
+h
+i
+any i ≥ 1 because E limsupT →∞ |Ai ∩TX≤T | ≤ P limsupT →∞ |Ai ∩TX≤T | ≥ 2ǫ + 2ǫ we obtain
+for all i ≥ 1
+
+
+ǫ
+|Ai ∩ X≤T | ǫ
+≥
+≥ .
+P limsup
+T
+2
+T →∞
+Again, because the inner quantity is increasing in the set A, we obtain
+
+
+
+
+|Ai ∩ X≤T | ǫ
+|Ai ∩ X≤T | ǫ
+≥ , ∀i ≥ 1 = lim P limsup
+≥ ,1 ≤ i ≤ I
+P limsup
+I→∞
+T
+T
+T →∞
+T →∞
+
+
+|AI ∩ X≤T | ǫ
+≥
+= lim P limsup
+I→∞
+T
+T →∞
+ǫ
+≥ .
+We will denote by H this event in which for all i ≥ 1, we have limsupT →∞ |Ai ∩TX≤T | ≥ 2ǫ .
+|A ∩X
+
+1|
+
+Under the event H, for any i, t0 ≥ 1, there always exists t1 > t0 such that i t1 ≤t ≥ 4ǫ . We
+construct a sequence of times (tp )p≥1 and indices (ip )p≥1 , (up )p≥1 by induction as follows.
+We first pose i1 = t0 = 0. Now assume that for p ≥ 1, the time tp−1 and index ip are defined.
+Let tp > tp−1 such that
+
+
+[  |Aip ∩ X≤t | ǫ 
+≥1− ǫ .
+≥
+P Hc ∪
+t
+2p+3
+tp−1 <t≤tp
+BLANCHARD, HANNEKE, AND JAILLET
+
+n
+o
+S
+|Aip ∩X≤t |
+ǫ
+This is also possible because H ⊂ t>tp−1
+≥
+t
+4 . Last, let ip+1 > ip such that
+ǫ
+P[Aip+1 ∩ X≤tp 6= ∅] ≤ 2p+3 which is possible since Au ↓ ∅ as u → ∞. We denote Ep this
+event. Then,
+
+
+[  |(Aip \ Aip+1 ) ∩ X≤t | ǫ 
+
+≥
+P Hc ∪
+t
+tp−1 <t≤tp
+
+
+
+≥ P  Ep ∩ H c ∪
+
+[
+
+tp−1 <t≤tp
+
+
+
+
+
+|Aip ∩ X≤t | ǫ
+≥1− ǫ .
+≥
+t
+2p+2
+
+We denote Fp this event. This ends the recursive construction of times tp and indices ip
+ǫ
+c
+by union bound, the event
+for allTp ≥ 1. Note that by construction,
+T P[Fp ] ≤ 2p+2 . Hence,
+H ∩ p≥1 Fp has probability P[H ∩ p≥1 Fp ] ≥ P[H] − 4ǫ ≥ 4ǫ . For conciseness, denote
+T
+Bp = Aip \ Aip+1 . On the event H ∩ p≥1 Fp we showed that for all p ≥ 1, there exists
+tp−1 < t ≤ tp such that |Bp ∩ X≤t | ≥ 4ǫ t, and (Bp )p≥1 is a sequence of disjoint measurable
+sets.
+Now for any p ≥ 1, we will construct a countable partition of Bp that separates all points
+falling in Bp within time horizon tp . Let δp > 0 such that
+
+
+ǫ
+ρ(Xu , Xv ) ≤ δp ≤ p+3 .
+P
+min
+u,v≤tp :Xu 6=Xv
+S
+We denote by Gp the complementary of this event. Note that P[ p≥1 Gpc ] ≤ 8ǫ . As a result, the
+T
+event I := H ∩ p≥1 (Fp ∩ Gp ) has probability at least 8ǫ . We will show that on this event, X
+disproves the C2 condition. Precisely, let (xi )i≥1 a dense sequence of X . We will denote the
+balls of X by B(x, r) = {x′ : ρ(x, x′ ) < r}. Define the following partition of X ,
+[
+P(δ) : Pi (δ) = B(xi , δ) \
+B(xj , δ).
+j<i
+
+S
+Finally, for any p, i ≥ 1, define Pip := Pi (δp ) ∩ Bp . We can note that i≥1 Pip = Bp . Further,
+the sets (Bip )i,p≥1 are all disjoint, and form a countable sequence. However, on the event I ,
+for every p ≥ 1, there exists a time tp−1 < t ≤ tp such that |Bp ∩ X≤t | ≥ 4ǫ t. But because the
+
+event Gp is satisfied, all the points falling in Bp within horizon t ≤ tp are separated by at least
+δp , hence fall in distinct sets Bip . As a result,
+ǫ
+|{i ≥ 1 : Pip ∩ X≤t 6= ∅}| ≥ |Bp ∩ X≤t | ≥ t.
+This shows that on the event I , for every p ≥ 1, there exists t > tp−1 such that |{i, p ≥ 1 :
+Pip ∩ X≤t 6= ∅}| ≥ 4ǫ t, and as a result
+|{i, p ≥ 1 : Pip ∩ X≤T 6= ∅}| ǫ
+≥ .
+T
+T →∞
+
+limsup
+
+The fact that P[I] ≥ 8ǫ ends the proof that X ∈
+/ C2 , and that the first proposition is equivalent
+to C2 .
+We now show the equivalence (2) ⇔ (3). We clearly have (3) ⇒ (2). Now suppose that X
+satisfies (2). Let M > 1 and A be a measurable set. Then, for any T ≥ 1, we have
+X
+X
+|A ∩ X≤t | M
+1A (Xt ) ≤ M
+1A (Xt ).
+=
+T
+T
+T
+≤M
+≤1
+t≤T,t∈T
+
+t≤T,t∈T
+
+Because (Xt )t∈T ≤1 ∈ C1 , we obtain as a result (Xt )t∈T ≤M ∈ C1 using the definition. This
+ends the proof of the proposition.
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+As a consequence of Proposition 3.2, we obtain new major insights on the noiseless fullfeedback setting. In this setting, an online learning sequentially observes an instance Xt ∈ X ,
+predicts a value Ŷt ∈ Y then observes the true value Yt = f ∗ (Xt ) for some unknown measurable function f : X → Y . Similarly to the notion P
+of universal consistence for contextual
+bandits, the goal is to find learning rules satisfying T1 Tt=1 ℓ(Yt , Ŷt ) → 0 (a.s.), where ℓ is
+a given near-metric on Y . For this setting, [20] gave a algorithm combining the Hedge algorithm and a “dense” countable family of measurable functions, universally consistent under
+C1 processes. [4] then gave a simple 1-nearest-neighbor-based algorithm 2C1NN and showed
+that in general separable Borel metrizable spaces [5], it is universally consistent under C2 processes, which are also necessary for universal learning [20]. Proposition 3.2 directly implies
+that combining the original algorithm from [20] on new instances Xt , i.e., on times T ≤1 , with
+memorization for previously observed instances also yields an optimistically universal learning rule. Unfortunately, such direct argument does not extend to a noisy setting [7] where the
+values Yt may not come from a fixed measurable function f ∗ (Xt ).
+3.2. Learning with experts algorithms. We give the main ingredients that will be used as
+sub-routine in our algorithms. We start by recalling classical result on the regret of EXP3.
+q T HEOREM 3.3 (Expected regret of EXP3 [8]). If EXP3 is run with parameters ηt =
+ln K
+tK on a multi-armed bandit with K arms, then the pseudo regret satisfies
+#
+#
+" T
+" T
+X
+X
+√
+rît (t) ≤ 2 T K ln K.
+ri (t) − E
+max E
+i=1,...,k
+
+t=1
+
+t=1
+
+We will also need an algorithm for adversarial multi-armed bandits that holds with high
+probability 1 − δ , with parameters that do not depend on the confidence δ nor the horizon T .
+T HEOREM 3.4 (High-probability regret of EXP3.IX [30]). There exists an algorithm
+EXP3.IX for adversarial multi-armed bandit with K ≥ 2 arms such that for any δ ∈ (0, 1)
+and T ≥ 1,
+!
+r
+T
+X
+√
+KT
+(rt (ai ) − rt (ât )) ≤ 4 KT ln K + 2
+max
++ 1 ln ,
+ln K
+δ
+i∈[K]
+t=1
+
+with probability at least 1 − δ .
+
+Specifically we will always use a very simplified version of this result. There exists a
+universal constant c > 0 such that
+max
+
+i∈[K]
+
+T
+X
+t=1
+
+√
+(rt (ai ) − rt (ât )) ≤ c KT ln K ln ,
+δ
+
+with probability 1 − δ for δ ≤ 21 . This has the following corollary which allows one to consider a countable family of experts asymptotically, based on an argument from [22, Corollary
+4]. We use the same construction to design an algorithm EXPINF for learning with a countably infinite number of experts—the original proof extended the Hedge algorithm to infinite
+number of experts in the full-feedback setting. Precisely, we use an increasing sequence of
+times (Ti )i≥1 such that the learning rule performs an independent EXP3.IX algorithm during
+each period [Ti , Ti+1 ). During this period, the EXP3.IX learner is run with i arms consisting
+P
+2
+in the experts Ek for k ≤ i. To ease the computations, we choose Ti = j<i j 3 = i (i+1)
+,
+which yields the following bounds.
+BLANCHARD, HANNEKE, AND JAILLET
+
+C OROLLARY 3.5. There is an online learning rule EXPINF using bandit feedback such
+that for any countably infinite set of experts {E1 , E2 , . . .} (possibly randomized), for any
+T ≥ 1 and 0 < δ ≤ 12 , with probability at least 1 − δ ,
+max
+
+1≤i≤T 1/8
+
+T
+X
+t=1
+
+√
+T
+(rt (Ei,t ) − rt (ât )) ≤ cT 3/4 ln T ln .
+δ
+
+where c > 0 is a universal constant. Further, with probability one on the learning and the
+experts, there exists T̂ such that for any T ≥ 1,
+max
+
+1≤i≤T 1/8
+
+T
+X
+t=1
+
+√
+(rt (Ei,t ) − rt (ât )) ≤ T̂ + cT 3/4 ln T ln T.
+
+P
+P ROOF. Denote by (Ti = j<i j 3 )i≥1 the restarting times used in the definition of
+EXPINF, and by ât its selected action at time t. Theorem 3.4 implies that for any i ≥ 1,
+with probability at least 0 < δ < 21 ,
+max
+
+Ti+1 −1
+
+1≤j≤i
+
+X
+
+t=Ti
+
+p
+√
+1
+rt (Ej,t ) − rt (ât ) ≤ c i(Ti+1 − Ti ) ln i ln = ci2 ln i ln .
+δ
+δ
+
+Now fix T ≥ 1 and δ > 0. Let i ≥ 0 such that Ti+1 ≤ T < Ti+2 . Then summing the above
+equations gives that with probability at least δ ,
+max
+
+1≤j≤T 1/8
+
+T
+X
+t=1
+
+rt (Ej,t ) − rt (ât ) ≤ T⌈T 1/8 ⌉ + (T − Ti+1 ) +
+≤ T⌈T 1/8 ⌉ + (i + 1) + c
+
+Ti+1 −1
+
+X
+
+t=T⌈T 1/8 ⌉
+
+rt (Ei,t ) − rt (ât )
+
+i(i + 1)(2i + 1) √
+i
+ln i ln .
+δ
+
+√
+√
+Now note that i ∼ 2T 1/4 and T⌈T 1/8 ⌉ ∼ 4T as T → ∞. Therefore, there exists a universal
+√
+constant c̃ such that for all T ≥ 1, the right-hand term is upper bounded by c̃T 3/4 ln T ln Tδ .
+This ends the proof of the first claim.
+Now for any T ≥ 1, using the probabilities of error δT = T12 which are summable, the
+Borel-Cantelli lemma implies that on an event of probability one, there exists T̂ such that for
+any T ≥ T̂ ,
+
+max
+
+1≤j≤T 1/8
+
+T
+X
+t=1
+
+√
+√
+rt (Ej,t ) − rt (ât ) ≤ c̃T 3/4 ln T ln(T 3 ) = 3c̃T 3/4 ln T ln T,
+
+which ends the proof of the second claim by redefining the constant c > 0.
+4. Finite action space. In this section, we assume that the action space A is finite and
+we show that in this case, the set of processes X admitting universal learning is exactly C2 .
+In other terms, we can recover the same processes which admit universal learning in the
+full-feedback setting.
+We start by showing that the C2 condition is necessary for universal consistency, which is
+a direct consequence from its necessity in the full-feedback case [20].
+T HEOREM 4.1.
+C2 .
+
+If 2 ≤ |A| < ∞, X ∈ C2 is necessary for universal consistency, i.e., C ⊂
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+
+P ROOF. In the full-information feedback setting, [20, Theorem 37] showed that X ∈ C2 is
+necessary for universal learning even for noiseless responses in binary classification. We will
+present a simple reduction from the full-feedback to the partial-feedback setting. Precisely, let
+a0 , a1 ∈ A be two distinct actions. To any measurable function f : X → {0, 1} we associate
+a deterministic reward function rf : X × A → [0, 1] as follows
+rf (x, a) = f (x)1[a = a1 ] + (1 − f (x))1[a = a0 ],
+
+x ∈ X , a ∈ A.
+
+Note that any action a ∈ A \ {a0 , a1 } always has reward 0. Now suppose that for a process
+X there exists an universally consistent learning rule f· for contextual bandits. Then, we can
+consider the following learning rule for the complete-feedback setting, recursively defined as
+f˜t (x≤t−1 , y ≤t−1 , xt ) = 1[ft (x≤t−1 , (1[f˜i (x≤i−1 , y ≤i−1 , xi ) = yi ])i≤t−1 , xt ) = a1 ].
+
+for any t ≥ 1, x≤t ∈ X t−1 and y ≤t−1 ∈ {0, 1}t−1 . We now shows that f˜· is universally consistent for the noiseless full-feedback setting. For any measurable function f : X → {0, 1},
+the learning rule f· is consistent for the rewards rf . In particular, if we denote by ât the
+action selected by f· at time t, using the measurable policy πf : x ∈ X 7→ a0 1[f (x) =
+0] + a1 1[f (x) = 1] ∈ A which always selects the best action we obtain
+T
+
+T
+
+t=1
+
+t=1
+
+1X
+1X
+1[ât 6= πf (Xt )] ≤ 0,
+limsup
+rt (πf (Xt )) − rt (ât ) = limsup
+T →∞ T
+T →∞ T
+
+(a.s.).
+
+Now consider the actions ât selected under X and rewards rf and denote by Ỹt the prediction
+of f˜· at time t under X and values Yt = f (Xt ) for t ≥ 1. By construction, for any t ≥ 1, we
+P
+have 1[ât 6= πf (Xt )] ≥ 1[Ỹt 6= f (Xt )]. Then, almost surely T1 Tt=1 1[Ỹt 6= f (Xt )] −→ 0.
+n→∞
+˜
+This shows that f· is universally consistent for noiseless responses in binary classification,
+hence X ∈ C2 , which completes the proof.
+We now present a learning rule for contextual bandits, which we will next show is universally consistent under any C2 process.
+This learning rule at time t has different behaviour depending on the number of occurrences of Xt that were observed in the past. Precisely, for any time t, we compute a corresponding category p such that the number of past occurrences of Xt belongs in the interval
+[4p , 4p+1 ). The learning rule will behave completely separately on times from different categories. The formal definition is given by the function below
+
+
+
+
+
+X
+
+
+
+
+
+C ATEGORY (t, X≤t ) = log4
+1[Xt′ = Xt ]  .
+t′ ≤t
+
+For convenience we may write C ATEGORY (t) instead of C ATEGORY (t, X≤t ). Further, for
+a given category p, the algorithm will proceed by periods [Tpq , Tpq+1 ) defined as follows.
+For any p ≥ 0 and q ≥ p2p , we define the times Tpq = 2k + 2ip 2k , where q = k2p + i with
+0 ≤ i < 2p . Note that the sequence (Tpq )q has an exponential behaviour with rate between
+2−p−1 and 2−p . We will refer to [Tpq , Tpq+1 ) as the period q for category p. We then define the
+function P ERIOD (t) which returns the index q such that Tpq ≤ t ≤ Tpq+1 where p is the category of p. Now let (π l )l≥1 be a sequence of measurable functions from X to A that are dense
+within measurable functions under C1 processes. Intuitively, the learning rule combines two
+strategies: a strategy 0 which applies a separate EXP3 algorithm to each distinct instance, and
+a strategy 1 which performs the best policy within a subset of the policies (π l )l≥1 . In order
+to know which strategy to apply, the learning rule computes an estimate of the counterfactual
+BLANCHARD, HANNEKE, AND JAILLET
+
+loss of strategy i, using classical importance sampling on some allocated exploration times
+for strategy i. On the exploitation times, the learning rule uses these estimates to perform the
+best strategy.
+We first define the procedure A SSIGN P URPOSE which taking as input a time t determines
+whether this time will be used for exploration of strategy 0 (output 0), strategy 1 (output 1),
+or exploitation (output 2). Intuitively, A SSIGN P URPOSE selects exploration times randomly
+with small probability while ensuring that times t, t′ from the same category p, period q , and
+that are duplicates Xt = Xt′ are assigned the same output, hence will serve for the same
+exploration or exploitation purpose. The algorithm is formally defined in Algorithm 1.
+Input: time t, X≤t , C ATEGORY(t′ ) for t′ ≤ t, A SSIGN P URPOSE(t′ ) for t′ < t.
+Output: A SSIGN P URPOSE(t) ∈ {0, 1, 2}.
+p = C ATEGORY(t); q = P ERIOD(t)
+// Not the first
+if exists t′ < t with C ATEGORY(t′ ) = p; P ERIOD(t′ ) = q and Xt = Xt′ then
+occurrence of Xt in current period
+Return A SSIGN P URPOSE(t′ )
+else
+// First occurrence of Xt in current period
+1/4
+pt = 1/(2t )
+Ut ∼ U([0, 1])
+if Ut ≤ pt then Return 0
+// Exploration for strategy 0
+else if pt < Ut ≤ 2pt then Return 1
+// Exploration for strategy 1
+else Return 2
+// Exploitation
+end
+
+Algorithm 1: A SSIGN P URPOSE
+Next, we define the subroutine E XPLORE (i; t) that will be called on exploration times t for
+strategy i. We first define it to estimate the performance of strategy 0. The subroutine updates
+an estimator R̂p0 (q) of the loss that would be incurred by using strategy 0 for all times in
+category p during period q . E XPLORE (0, ·) is defined formally in Algorithm 2.
+Input: time t, X≤t , C ATEGORY(t′ ) for t′ ≤ t, rewards r<t , R̂p0 (q) for p ≥ 0, q ≥ p2p .
+Output: Selects action ât and updates R̂p0 (q) for p = C ATEGORY(t), q = P ERIOD(t).
+p = C ATEGORY(t), q = P ERIOD(t)
+St = {t′ < t : C ATEGORY(t′ ) = p, P ERIOD(t′ ) = q, Xt′ = Xt }
+ât = EXP3A (âSt , rSt )
+Receive reward rt
+Let t′ = min St
+// First occurrence of Xt
+R̂p0 (q) ← R̂p0 (q) + prt′
+// Update estimate R̂p0 (q)
+t
+
+Algorithm 2: E XPLORE (0; ·)
+Then, we define E XPLORE (1, ·). It updates an estimator R̂pl (q) of the loss that would have
+been incurred using the policy π l for all times in category p during period q , for all l ≥ 1.
+Because there is an infinite number of such policies, they are introduced sequentially in the
+estimation process. E XPLORE is defined formally in Algorithm 3.
+The estimates R̂pl (q) updated by E XPLORE are then used to select the strategy to perform
+on exploitation times. The learning rule that we will define acts separately on times from
+different categories: for any category p ≥ 0, before starting phase q , the learning rule commits to performing strategy Pp (q) ∈ {0, 1}, for times of that phase q for category p. The
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+Input: time t, X≤t , C ATEGORY(t′ ) for t′ ≤ t, rewards r<t , R̂pl (q) for l ≥ 1, p ≥ 0, q ≥ p2p .
+
+Output: Selects action ât and updates R̂pl (q) for p = C ATEGORY(t), q = P ERIOD(t).
+p = C ATEGORY(t), q = P ERIOD(t), k = ⌊log 2 t⌋
+lt = U({1, . . . , k})
+// Uniform exploration
+ât = π lt (Xt )
+Receive reward rt
+Let t′ = min{s < t : C ATEGORY(s) = p, P ERIOD(s) = q, Xs = Xt }
+Xt
+R̂pl (q) ← R̂pl (q) + pk′ rt 1[l = lt ],
+t
+
+// First occurrence of
+// Update estimate R̂plt (q)
+
+1≤l≤k
+
+Algorithm 3: E XPLORE (1; ·)
+
+choice of strategy Pp (q) is performed by a subroutine S ELECT S TRATEGY which applies an
+ηp = O(2−p/2 ) average reward penalty for strategy 0 then select the strategy that obtained
+the highest adjusted estimated reward during the previous period. Last, if during the current
+period q , strategy 0 obtained the highest adjusted reward, we select this strategy for the future
+periods q < q ′ ≤ q + p2p . This ensures that if by mistake the rule selected Pp (q) = 1, the loss
+incurred during this period is mitigated for the next strategy selection: the current perforp
+mance until time T q+1 is negligible up to a small average loss starting from time Tpq+2 +1 .
+The construction of S ELECT S TRATEGY is detailed in Algorithm 4.
+q+1
+
+Input: Category p, phase q, variable states R̂pl (t) for t < Tp
+Output:√
+Selects strategy Pp (r) for some future phases r > q.
+ηp = 10
+
+|A| ln |A|
+q
+, k = ⌊log2 Tp ⌋
+2p/4
+
+if Pp (q + 1) has not been defined yet then
+q+1
+q
+if R̂p0 (q) − ηp (Tp
+− Tp ) ≥ max R̂pl (q) then
+1≤l≤k
+
+else
+end
+
+Pp (q ′ ) = 0, q < q ′ ≤ q + p2p
+// perform strategy 0 until current
+performance is negligible up to a O(2−p ) average loss
+Pp (q + 1) = 1
+
+end
+
+Algorithm 4: S ELECT S TRATEGY
+We are now ready to define the learning rule for stochastic rewards. On exploration times,
+the learning rule calls the subroutine E XPLORE, and on exploitation times, the learning rule
+performs the corresponding strategy Pp (q) for times in category p during phase q . The construction of the learning rule is detailed in Algorithm 5.
+The main result of this section is that this learning rule is optimistically universal.
+T HEOREM 4.2. Let X a metrizable separable Borel space and A a finite action set.
+Then, there exists an optimistically universal learning rule and the set of learnable processes
+is C = C2 .
+BLANCHARD, HANNEKE, AND JAILLET
+R̂pl = 0, l ≥ 0, p ≥ 0; Pp (p2p+5 ) = 0, p ≥ 0
+// Initialization
+for t ≥ 1 do
+Observe context Xt
+p = C ATEGORY(t), q = P ERIOD(t)
+if t < 232p then
+// Initially perform strategy 0 without period
+restriction
+St = {t′ < t : C ATEGORY(t′ ) = p, Xt′ = Xt }
+ât = EXP3A (âSt , r St )
+else if i := A SSIGN P URPOSE(t) ≤ 1 then
+E XPLORE(i; t)
+else
+// Perform strategy Pp (q)
+if Pp (q) = 0 then
+St = {t′ < t : C ATEGORY(t′ ) = p, P ERIOD(t′ ) = q, Xt′ = Xt }
+ât = EXP3A (âSt , r St )
+else
+q
+k = ⌊log2 Tp ⌋
+St = {t′ < t : C ATEGORY(t′ ) = p, P ERIOD(t′ ) = q, A SSIGN P URPOSE(t′ ) = 2}
+
+// Select policy π lt
+lt = EXP3.IX{1,...,k} lSt , rSt
+ât = π lt (Xt )
+end
+Receive reward rt
+
+end
+′
+
+q ′ +1
+
+E = {(p′ , q ′ ) : q ′ ≥ p′ 2p +5 , t = Tp′
+
+for (p′ , q ′ ) ∈ E do
+
+S ELECT S TRATEGY(p′ , q ′ )
+
+− 1}
+q′
+
+q ′ −1
+
+// At the end of a phase [Tp′ , Tp′
+
+), select
+
+strategy for future phases
+end
+end
+
+Algorithm 5: An optimistically universal learning rule for stochastic rewards
+P ROOF. We will denote by ât the action selected by the learning rule at time t. For any
+p ≥ 0, we define the set Tp of times in category p as follows
+
+
+
+
+X
+Tp = t ≥ 1 : 4p ≤
+1[Xt′ = Xt ] < 4p+1 ,
+
+
+′
+t ≤t
+
+i.e. the set of times which correspond to duplicates of index in [4p , 4p+1 ). We also define
+Tpexp,i = {t ≥ 232p : A SSIGN P URPOSE (t) = i},
+T̃p = {t ≥ 232p : A SSIGN P URPOSE (t) = 2},
+
+i ∈ {0, 1},
+
+the set of exploration times for strategy i in category p, and exploitation times in category
+p, respectively. For convenience, we also define Tp (q) = Tp ∩ [Tpq , Tpq+1 ) times in category p
+and phase q . Last, we define Ap (q) = |Tp (q) ∩ (Tpexp,0 ∪ Tpexp,1)| the number of exploration
+times in period q for category p.
+Now fix a process X ∈ C2 and let r be a reward mechanism on A × X . We recall the
+notation r̄(·, ·) = E[r(·, ·)] for the average reward. We aim to show that f· is consistent under
+X for the rewards given by r . We first define the policy π ∗ given by
+π ∗ (x) = arg max r̄(a, x),
+a∈A
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+where ties are broken by the lexicographic rule. This function is measurable given that A is
+finite. Further, it is an optimal policy in the sense that for any measurable function π : X → A
+and any x ∈ X , r̄(π(x), x) ≤ r̄(π ∗ (x), x).
+p+5
+For p ≥ 0, we first analyze the reward estimates R̂pl (q) for q ≥ p2p+5 (Tpp2 = 232p ) and
+l ≥ 0. First note that the exploration times Tpexp,0 and Tpexp,1 were constructed precisely so
+that times corresponding to the same instance and within the same period, fall in the same set
+Tpexp,0 , Tpexp,1 , or T̃p . For simplicity, we will write Xp (q) = {Xt , t ∈ Tp (q)} the set of visited
+instances during period q of category p, and for x ∈ Xp (q) we denote tp (q; x) = min{t ∈
+Tp (q) : Xt = x} the first time of occurrence of x in period q . Then, we can write
+R̂p0 (q) =
+
+X
+
+1[Ut (q;x) ≤ pt (q;x) ]
+p
+
+ptp (q;x)
+
+x∈Xp (q)
+
+X
+
+p
+
+r̃t
+
+t∈Tp (q),Xt =x
+
+where r̃t is the reward at time t that would have been obtained by performing strategy 0
+during period q , i.e., assigning an independent EXP3 learner for each different instance in
+this period. We compare R̂p0 (T ) to the average reward obtained by the optimal policy π ∗ ,
+X
+R̄p∗ (q) :=
+r̄(π ∗ (Xt ), Xt ).
+t∈Tp (q)
+
+Observe that conditionally on X, the terms in the sum of R̂p0 (q) are independent. For any
+P
+x ∈ Xp (q), let R̄p0 (q; x) = E[ t∈Tp (q),Xt =x r̃t | X], the average reward obtained by strategy 0
+on the instance x. We will use the notation Np (q; x) = |{t ∈ Tp (q), Xt = x}| ≤ 4p+1 for the
+number of occurrences of the instance x within Tp . Note that
+
+1[Ut (q;x) ≤ pt (q;x) ]
+p
+
+p
+
+ptp (q;x)
+
+X
+
+t∈Tp (q),Xt =x
+
+r̃t ≤
+
+Np (q; x)
+≤ 22p+3 (Tpq+1 )1/4 ,
+ptp (q;x)
+
+Tpq+1
+22p
+
+since by definition of Tp each instance has already occurred 4p times.
+and that |Xp (q)| ≤
+As a result, we can apply Hoeffding’s inequality to obtain
+
+
+!
+q+1 1/4
+X
+(T
+)
+p
+R̄p0 (q; x) ≤ (Tpq+1 ) 8 | X ≥ 1−2 exp − 2p+5
+P  R̂p0 (q) −
+:= 1−2p1 (p, q)
+x∈Xp (q)
+
+Now applying Theorem 3.3 to each pseudo-regret R̄p0 (q; x) yields
+X
+R̄p0 (q; x)
+x∈Xp (q)
+
+≥
+
+X
+
+x∈Xp (q)
+
+s
+
+Np (q; x) max r̄(a, x) − 2
+a∈A
+
+|A| ln |A|
+Np (q; x)
+
+!
+
+r
+
+p
+|A| ln |A| q+1
+q
+(T
+−
+T
+)
+−
+|A| ln |A|
+p
+p
+2p/2
+
+p
+
+p
+|A| ln |A| q+1
+2p/2 q+1
+q
+|A|
+ln
+|A|
+(T
+−
+T
+)
+−
+T
+p
+p
+4p p
+2p/4
+
+≥ R̄p∗ (q) − 2
+
+≥ R̄p∗ (q) − 2
+≥ R̄p∗ (q) − 6
+
+p
+
+|A| ln |A| q+1
+(Tp − Tpq ).
+2p/4
+
+X
+
+x∈Xp (q),Np (q;x)≤2p/2
+
+Np (q; x)
+BLANCHARD, HANNEKE, AND JAILLET
+
+where in the third inequality, we used the fact that instances appearing in Tp before Tpq+1 are
+visited at least 4p times before horizon Tpq+1 , by construction of Tp ; and in the last inequality
+P
+we used 2−p−1 Tpq+1 ≤ Tpq+1 − Tpq ≤ 2−p Tpq . Also, note that R̄p∗ (q) ≥ x∈Xp (q) R̄p0 (q; x). As
+a result, taking the expectation over X, we obtain that with probability at least 1 − 2p1 (p, q),
+p
+|A| ln |A| q+1
+∗
+q+1 78
+(Tp − Tpq ).
+(3)
+R̂p (q) − R̄p (q) ≤ (Tp ) + 6
+p/4
+Now consider the quantity R̃p0 (q), the reward that would be obtained for exploitation times
+on period q if strategy 0 was applied. We have
+X
+X
+R̃p0 (q) =
+r̃t
+x∈Xp (q) t∈Tp (q),Xt =x,t∈T̃p
+
+≥
+
+X
+
+X
+
+x∈Xp (q) t∈Tp (q),Xt =x
+
+r̃t − Ap (q).
+
+Similarly as above, using Hoeffding’s inequality, we have
+
+
+√ q+1
+X
+X
+X
+Tp
+q+1 3/4 
+− 22p+3
+
+R̄p (q; x) − (Tp )
+r̃t ≥
+≥1−e
+P
+:= 1 − p2 (p, q).
+x∈Xp (q) t∈Tp (q),Xt =x
+
+x∈Xp (q)
+
+As a result, with probability 1 − p2 (p, q), we have
+p
+|A| ln |A| q+1
+∗
+(4)
+R̃p (q) ≥ R̄p (q) − 6
+(Tp − Tpq ) − (Tpq+1 )3/4 − Ap (q).
+2p/4
+
+We now turn to the estimates R̂pl (q) for l ≥ 1. Note that the estimation of Rpl (q) only starts
+at time 2l . Hence, we can consider k(q) = ⌊log2 Tpq ⌋ = ⌊ 2qp ⌋ and observe that during period
+q , the only estimates R̂pl (q) that are considered are for 1 ≤ l ≤ k(q). Therefore, similarly as
+for the estimates R̂p0 (q), we can write for q ≥ p2p+5 and 1 ≤ l ≤ k(q),
+R̂pl (q) =
+
+X
+
+1[pt (q;x) < Ut (q;x) ≤ 2pt (q;x) ]
+p
+
+x∈Xp (q)
+
+p
+
+p
+
+ptp (q;x)
+
+X
+
+k(t)1[l = lt ]r(π l (x), x),
+
+t∈Tp (q)Xt =x
+
+where k(t) is the number of policies π l tested at time t, i.e. k(t) = ⌊log2 t⌋. Conditionally on
+X and U we can apply Hoeffding’s inequality to obtain
+
+X
+X
+1[ptp (q;x) < Utp (q;x) ≤ 2ptp (q;x) ] l
+r̄(π (x), x)
+P  R̂pl (q) −
+ptp (q;x)
+x∈Xp (q) t∈Tp (q),Xt =x
+
+≤ (Tpq+1 )7/8 | X, U
+
+−
+
+≥ 1 − 2e
+
+q+1 7/4
+2(Tp
+)
+q+1
+q
+q+1 2
+(Tp
+−Tp )4(log 2 Tp
+)
+
+√ q+1
+Tp
+
+−
+
+≥ 1 − 2e
+
+q+1 1/4
+2p (Tp
+)
+q+1 2
+4(log2 Tp
+)
+
+i
+
+:= 1 − 2p3 (p, q).
+
+l
+For convenience, let us denote by R̂p,bis
+(q) the sum in the above inequality. We also define
+P
+l
+l
+R̄p (q) = t∈Tp (q) r̄(π (Xt ), Xt ) the expected reward of policy l on period q . Now, similarly
+as before, we have
+X
+1[ptp (q;x) < Utp (q;x) ≤ 2ptp (q;x) ] l
+Np (q; x)
+0≤
+r̄(π (x), x) ≤
+≤ 22p+3 (Tpq+1 )1/4 .
+ptp (q;x)
+ptp (q;x)
+t∈Tp (q),Xt =x
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+
+As a result, conditionally on X, Hoeffding’s inequality yields
+l
+(q) − R̄pl (q)| ≤ (Tpq+1 )7/8 | X] ≥ 1 − 2p1 (p, q).
+P[|R̂p,bis
+
+Thus, with probability at least 1 − 2p1 (p, q) − 2p3 (p, q) we have
+|R̂pl (q) − R̄pl (q)| ≤ (Tpq+1 )7/8 .
+
+(5)
+
+Next, we consider the quantity R̃p1 (q), the reward that would have been obtained for exploitation times on period q if strategy 1 was applied. Then, using Theorem 3.4, we have with
+q+1 1/4
+probability at least 1 − e−(Tp ) := 1 − p4 (p, q),
+q
+X
+l
+max
+rt (π (Xt ), Xt ) − R̃p (q) ≤ c k(q) ln k(q)(Tpq+1 − Tpq )(Tpq+1 )1/4
+1≤l≤k(q)
+
+t∈Tp (q)∩T˜p
+
+≤ c(Tpq+1 )3/4 ln Tpq+1 .
+
+As a result, we have
+R̃p1 (q) ≥ max
+
+1≤l≤k(q)
+
+X
+
+t∈Tp (q)
+
+rt (π l (Xt ), Xt ) − c(Tpq+1 )3/4 ln Tpq+1 − Ap (q).
+
+Now,√by Hoeffding’s inequality, for every 1 ≤ l ≤ k(q), with probability at least 1 −
+q+1
+p
+e−2 Tp := 1 − p5 (p, q),
+X
+rt (π l (Xt ), Xt ) ≥ R̄pl (q) − (Tpq+1 )3/4 .
+t∈Tp (q)
+
+Hence, with probability 1 − p4 (p, q) − k(q)p5 (p, q) we have
+
+R̃p1 (q) ≥ max R̄pl (q) − (Tpq+1 )3/4 − c(Tpq+1 )3/4 ln Tpq+1 − Ap (q).
+
+(6)
+
+1≤l≤k(q)
+
+We will also need the quantity R̃p1 (q; T ) for Tpq ≤ T < Tpq+1 which is the reward that would
+have been obtained for exploitation times from Tpq to T . The exact same arguments as above
+show that with probability at least 1 − p4 (p, q) − k(q)p5 (p, q) we have
+(7)
+
+R̃p1 (q; T ) ≥ max
+
+1≤l≤k(q)
+
+X
+
+t∈Tp (q),t≤T
+
+r̄(π l (Xt ), Xt ) − (Tpq+1 )3/4 − c(Tpq+1 )3/4 ln Tpq+1
+− Ap (q).
+
+Last, we now bound the exploration terms Ap (q) to show that exploration times are negP
+p (q;x)
+ligible. Writing Ap (q) = x∈Xp (q) 1[Utp (q;x) ≤ 2ptp (q;x) ]Np (q; x), and because tpN(q;x)
+1/4 ≤
+
+22p+2 (Tpq+1 )1/4 , using Hoeffding’s inequality we obtain that with probability at least 1 −
+q+1 1/4
+(Tp
+)
+22p+3
+
+e−
+
+(8)
+
+:= 1 − p6 (p, q),
+
+Ap (q) ≤
+
+X
+
+x∈Xp (q)
+
+Tpq+1 − Tpq
+Np (q; x)
+q+1 7/8
++
+(T
+)
+≤
++ (Tpq+1 )7/8 ≤ 2(Tpq+1 )7/8 .
+p
+tp (q; x)1/4
+(Tpq )1/4
+
+Now recalling that k(q) ≤ 2qp , we have that
+X X
+
+2p1 (p, q) + p2 (p, q) + p6 (p, q) + k(q)(2p1 (p, q) + 2p3 (p, q))
+
+p≥0 q≥p2p+5
+
++ (p4 (p, q) + k(q)p5 (p, q))(1 + Tpq+1 − Tpq ) < ∞.
+BLANCHARD, HANNEKE, AND JAILLET
+
+As a result, the Borel-Cantelli lemma implies that on an event E of probability one, there
+exists T̂1 such that for any p ≥ 0, q ≥ p2p+5 Eq (3), (4), (6) and (8) are satisfied, and (5) is
+satisfied for q ≥ l, p2p+5 , and Eq (7) is satisfied for Tpq ≤ T < Tpq+1 .
+We are
+√ now ready to prove the universal consistence of the learning rule. First, we pose
+|A| ln |A|
+
+and aim to show that the average errorP
+made by the learning rule on
+ǫp = 2 2p/4
+Tp is O(ǫp ) uniformly over time. Note in particular that p≥0 ǫp < ∞. For any T ≥ 1,
+P
+we define Rp (T ) = t≤T,t∈Tp rt the reward obtained by the learning rule, and R̄p∗ (T ) =
+P
+∗
+t≤T,t∈Tp r̄(π (Xt ), Xt ) the reward obtained by the optimal policy. To do so, we first
+start by analyzing the regret on the first period [1, 232p ) where there is no exploration
+and the learning rule uses EXP3.IX learners on each new instance. For T < 232p let
+Xp (T ) := {Xt , t ∈ Tp , t ≤ T }. Note that |Xp (T )| ≤ 4Tp by definition P
+of Tp . For x ∈ Xp (T ),
+2p+2
+let Np (T ; x) = |{t ≤ T, t ∈ Tp , Xt = x}| ≤ 2
+and R̄p (T ; x) := E[ t≤T,t∈Tp ,Xt =x r̃t | X]
+where r̃t is the reward obtained if we used strategy 0. Now by Theorem 3.4, for every
+2 1/27
+x ∈ Xp (T ), with probability at least 1 − e−p T
+, we have
+q
+X
+rt (π ∗ (x), x) − Rp (T ) ≤ cpT 1/2 |A| ln |A|Np (T ; x)
+t≤T,t∈Tp (T ),Xt =x
+1/27
+
+As a result, with probability at least 1 − T e−p T
+:= 1 − p7 (p, T ),
+p
+X
+X
+X
+rt (π ∗ (x), x) − rt ≤ p T +
+p
+t≤T,t∈Tp
+
+x∈Xp (T ),Np (T ;x)≥2 t≤T,t∈Tp ,Xt =x
+
+p
+T
+≤ p + cp |A| ln |A|T 1/2
+X
+
+rt (π ∗ (x), x) − rt
+
+x∈Xp (T ),Np (T ;x)≥2p
+
+q
+Np (T ; x)
+
+p
+T
+T
++ cp |A| ln |A|T 1/2 p/2
+p
+2
+T
+cp
+≤ p+
+|A| ln |A|T 1−1/2 log2 T,
+2
+≤
+
+where in the last inequality, we used 22p ≤ T <√232p , thus 2p/2 ≥ T 1/64 . Then, by Hoeffding’s
+inequality, we have with probability 1 − e−2p T := 1 − p8 (p, T ),
+X
+log2 T 3/4
+rt (π ∗ (x), x) ≥ R̄p∗ (T ) −
+T .
+t≤T,t∈Tp
+
+Finally, with probability at least 1 − p7 (p, T ) − p8 (p, T ), we obtain
+1 + cp
+T
+(9)
+Rp (T ) ≥ R̄p∗ (T ) −
+|A| ln |A|T 1−1/2 log2 T − p .
+2
+P
+P
+Noting that p≥0 T ≥1 p7 (p, T ) + p8 (p, T ) < ∞, the Borel-Cantelli lemma implies that on
+an event F of probability one, there exists T̂2 such that for all T ≥ T̂2 , and p ≥ 0 such that
+T < 232p , Eq (9) holds. We will now suppose that the event E ∩ F of probability one is met.
+Next we consider the case of T ≥ 232p , and let q0 ≥ p2p+5 such that Tpq0 ≤ T < Tpq0 +1 .
+Then, consider
+
+
+k
+p+5
+q+1
+q
+Sp := p2
+≤ q < q0 : R̂p (q) − ηp (Tp − Tp ) ≥ max R̂p (q) ,
+1≤l≤k(q)
+
+the set of phases where the learning rule estimated that strategy 0 performed better than
+strategy 1. Next, let Ppi = {p2p+5 ≤ q < q0 : Pp (q) = i} the set of phases where the learning
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+rule performed strategy i for i ∈ {0, 1}. An important observation is that for two phases
+q1 < q2 ∈ Sp0 ∩ Pp1 , if strategy 1 should not have been performed, then q2 > q1 + p2p . In
+particular, we have Tpq1 ≤ 2−p Tpq2 , hence Tpq1 +1 − Tpq1 ≤ 2−p (Tpq2 +1 − Tpq2 ). This allows to
+dissipate the errors made during phases where the algorithm performs strategy 1 by mistake.
+Precisely, using a descending induction we obtain
+X
+
+Tpq+1 − Tpq ≤
+
+q∈Sp0 ∩Pp1
+
+Tpq0 − Tpq0 −1
+≤ 2 · 2−p Tpq0 ≤ 2−p+1 T ≤ 2ǫp T.
+1 − 2−p
+
+On all other phases Pp0 ∪ (Pp1 \ Sp0 ), the performance of the learning rule is close to having
+performed strategy 0 on all phases. Indeed, using Eq (6) we obtain
+X
+X
+R̃p1 (q) ≥
+max R̄pl (q) − (Tpq+1 )3/4 − c(Tpq+1 )3/4 ln Tpq+1 − Ap (q)
+q∈(Pp1 \Sp0 )
+
+q∈(Pp1 \Sp0 )
+
+≥
+≥
+≥
+
+X
+
+l=1,...,k(q)
+
+max
+
+q∈(Pp1 \Sp0 )
+
+l=1,...,k(q)
+
+R̂pl (q) −
+
+
+X
+4(Tpq+1 )7/8 + c(Tpq+1 )3/4 ln Tpq+1
+
+q<q0
+
+X
+
+R̂p0 (q) − ηp Tpq0 − 4(4 + c ln Tpq0 )T 15/16
+
+X
+
+R̄p∗ (q) − ηp T − 3ǫp T − 4(5 + c ln T )T 15/16 .
+
+q∈(Pp1 \Sp0 )
+
+q∈(Pp1 \Sp0 )
+
+In the second inequality,Pwe used Eq (5) and in the third inequality, we used the definition
+p
+of Sp0 and the identities q≤q0 (Tpq )7/8 ≤ (Tpq0 )7/8 1−22−7/8 ≤ 2p+2 (Tpq0 )7/8 ≤ 4T 15/16 . In the
+last inequality, we used Eq (3). Next, using Eq (4) we have directly
+X
+X
+R̃p0 (q) ≥
+R̄p∗ (q) − 3ǫp T − 3 · 4T 15/16 .
+q∈Pp0
+
+q∈Pp0
+
+Combining the two above inequalities and observing that ηp = 5ǫp gives
+X
+X
+X
+rt ≥
+R̃p1 (q)
+R̃p0 (q) +
+q
+
+q∈Pp0
+
+232p ≤t<Tp 0 ,t∈Tp
+
+≥
+≥
+≥
+
+q∈P1 \S 0
+
+X
+
+q∈Pp0 ∪(Pp1 \Sp0 )
+
+R̄p∗ (q) − 11ǫp T − (32 + 4c ln T )T 15/16
+
+X
+
+R̄p∗ (q) −
+
+X
+
+R̄p∗ (q) − 13ǫp T − (32 + 4c ln T )T 15/16 .
+
+p2p+5 ≤q<q0
+
+p2p+5 ≤q<q0
+
+X
+
+q∈Sp0 ∩Pp1
+
+(Tpq+1 − Tpq ) − 11ǫp T − (32 + 4c ln T )T 15/16
+
+Now recalling the former estimate of Rp (T ) for T < 232p , we obtain
+X
+Rp (T ) ≥ Rp (232p − 1) +
+rt
+q
+
+232p ≤t<Tp 0 ,t∈Tp
+
+1 + cp
+T
+|A| ln |A|T 1−1/2 log2 T − 13ǫp T − (32 + 4c ln T )T 15/16
+≥ R̄p∗ (T ) − 2 p −
+2
+p
+1
++
+c
+|A| ln |A|T 1−1/2 log2 T − (32 + 4c ln T )T 15/16 − 15ǫp T
+≥ R̄p∗ (T ) −
+26
+
+BLANCHARD, HANNEKE, AND JAILLET
+
+where the term 2Tp comes from the fact that T − (Tpq0 − 1) ≤ Tpq0 +1 − Tpq0 ≤ 2Tp . Now note that
+if t ∈ Tp , there were at least 4p duplicates, hence t ≥ 4p . As a result, we can always suppose
+without loss of generality that T ≥ 4p . Combining with the case T < 232p , we obtain that for
+all T ≥ max(T̂1 , T̂2 ), p ≥ 0 with t ≥ 4p ,
+p
+(10)
+Rp (T ) ≥ R̄p∗ (T ) − (33 + 5c) |A| ln |A|T 1−1/2 log2 T − 15ǫp T.
+
+This ends the proof that on times
+P Tp , the learning rule has an average error at most O(ǫp )
+on the event E ∩ F . Because p≥0 ǫp < ∞, we can afford to converge on each set Tp to the
+optimal policy independently.
+Precisely, we aim to show that
+T
+
+1X
+r̄(π ∗ (Xt ), Xt ) − rt ≤ 0, (a.s.).
+T →∞ T t=1
+P
+ǫ
+Fix 0 < ǫ ≤ 1, δ > 0 and let p0 such that p≥p0 ǫp < 15
+. Because X ∈ C2 , by Proposition 3.2,
+p0
+≤4
+∈ C1 . As a result, because the sequence of policies (π l )l is dense under C1 processes,
+X
+there exists l0 ≥ 1 such that
+
+
+X
+ǫδ
+1[π∗ (Xt ) 6= πl0 (Xt )] ≤ 2p0 +2 .
+E limsup
+T
+p0
+T →∞
+≤4p0
+limsup
+
+t≤T,t∈T
+
+Then, by the dominated convergence theorem, there exists T0 such that
+
+
+X
+ǫδ
+E  sup
+1[π∗ (Xt ) 6= πl0 (Xt )] ≤ 2p0 +1 .
+p0
+T ≥T0 T
+≤4p0
+t≤T,t∈T
+
+In particular, on an event Bδ of probability at least 1 − δ , the Markov inequality yields that
+for all T ≥ T0 ,
+X
+ǫ
+1[π∗ (Xt ) 6= πl0 (Xt )] ≤ 2p0 +1 T.
+p0
+≤4p0
+t≤T,t∈T
+
+p
+
+In particular, the above equation holds if we replace T ≤4 0 by Tp for any p < p0 . Now suppose that the event E ∩ F ∩ Bδ of probability at least 1 − δ is met. For any p < p0 and
+q ≥ p2p+5 such that Tpq ≥ T̂ := max(T̂1 , T̂2 , 2l0 , 232p0 ), because Tpq ≥ 2l0 , we have
+max R̂pk (q) ≥ R̂pl0 (q)
+
+1≤l≤k(q)
+
+≥ R̄pl0 (q) − (Tpq+1 )7/8
+≥ R̄p∗ (q) − (Tpq+1 )7/8 −
+
+X
+
+t∈Tp (q)
+
+1[π∗ (Xt ) 6= πl (Xt )]
+≥ R̂p0 (q) − 2(Tpq+1 )7/8 − 3ǫp (Tpq+1 − Tpq ) − 2−2p−1 Tpq+1
+≥ R̂p0 (q) − 2(Tpq+1 )7/8 − 4ǫp (Tpq+1 − Tpq ).
+
+where in the second inequality we used Eq (5) and in the fourth we used Eq (3). In the last
+ǫp
+T for any
+inequality, we used 2−p−1 Tpq+1 ≤ Tpq+1 − Tpq . Now let T1 such that 2T 7/8 < 2p+1
+q
+p+5
+T ≥ T1 . Then, for any p < p0 and q ≥ p2
+such that Tp ≥ T̃ := max(T̂ , T1 ), we have
+max R̂pk (q) > R̂p0 (q) − 5ǫp (Tpq+1 − Tpq ),
+
+1≤l≤k(q)
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+which implies Pp (q + 1) = 1 since ηp = 5ǫp if Pp (q + 1) was not already defined. In other
+terms, starting from time 2p0 T̃ , the learning rule always chooses strategy 1 for categories
+p < p0 . We now bound the error of the learning rule on Tp for p < p0 . Let q̃ such that Tpq̃−1 ≤
+q(T )
+q(T )+1
+2p0 T̃ < Tpq̂ . For any T ≥ 2p0 T̃ and q(T ) such that Tp
+≤ T < Tp
+, we can write
+X
+X
+Rp (T ) − R̄p∗ (T ) ≥
+(R̃p1 (q) − R̄p∗ (q)) + R̃p1 (q(T ), T ) −
+r̄(π ∗ (Xt ), Xt )
+q̃<q<q(T )
+
+t∈Tp (q),t≤T
+
+− 2p0 T̃ −
+≥
+
+X
+
+X
+
+Ap (q)
+
+q<q(T )
+
+(Rpl0 (q) − R̄p∗ (q)) −
+
+q̃<q<q(T )
+
+−
+≥−
+
+X
+
+t≤T,t∈Tp
+
+X
+
+X
+
+1[π∗ (Xt ) 6= πl (Xt )] − 2p T̃
+t∈Tp (q),t≤T
+(2Ap (q) + (Tpq+1 )3/4 + c(Tpq+1 )3/4 ln Tpq+1 )
+
+q≤q(T )
+
+1[π∗ (Xt ) 6= πl (Xt )] − 2p T̃ − 4(3 + c)(Tpq(T )+1 )15/16 ln Tpq(T )+1
+0
+
+≥ −2p0 T̃ − 16(3 + c)T 15/16 ln T −
+
+ǫ
+T.
+2p0 p0
+
+where in the second inequality we applied Eq (6) and Eq (7), and in the third inequality, we
+P
+q(T )+1 7/8
+)
+proved earlier. As a result, we
+used the identity q≤q(T ) (Tpq+1 − Tpq )3/4 ≤ 4(Tp
+can write
+X
+R̄p∗ (T ) − Rp (T ) ≤ p0 2p0 T̃ + 16p0 (3 + c)T 15/16 ln T + ǫT.
+p<p0
+
+Now because the events E, F are met, using Eq (10), we also have for T ≥ T̃
+X
+X
+R̄p∗ (T ) − Rp (T ) =
+R̄p∗ (T ) − Rp (T )
+p≥p0
+
+p0 ≤p<log4 T
+
+X
+p
+≤ (17 + 3c) |A| ln |A|T 1−1/2 (log2 T )2 + 15
+ǫp · T
+p≥p0
+
+p
+≤ (17 + 3c) |A| ln |A|T 1−1/2 (log2 T )2 + ǫT
+
+Summing the two above inequalities gives
+T
+X
+t=1
+
+r̄(π ∗ (Xt ), Xt ) − rt ≤ p0 2p0 T̃ + 16p0 (3 + c)T 15/16 ln T
+
+p
++ (17 + 3c) |A| ln |A|T 1−1/2 (log2 T )2 + 2ǫT.
+
+As a result, on the event E ∩ F ∩ G ∩ Bδ of probability at least 1 − δ , we have
+T
+
+1X
+r̄(π ∗ (Xt ), Xt ) − rt ≤ 2ǫ.
+T
+T →∞
+
+limsup
+
+t=1
+
+Because this holds
+P for any δ > 0 and 0 < ǫ < 1, this shows that almost surely, we have
+limsupT →∞ T1 Tt=1 r̄(π ∗ (Xt ), Xt ) − rt ≤ 0. We denote by C this event. We now formally
+BLANCHARD, HANNEKE, AND JAILLET
+
+show that the learning rule is universally consistent. Let π : X → A be a measurable function.
+First, by the Hoeffding inequality, we have for T ≥ 1,
+#
+" T
+√
+X
+3/4
+1 − e−2 T .
+rt (π(Xt ), Xt ) − r̄t (π(Xt ), Xt ) ≤ T
+P
+t=1
+
+As a result, the Borel-Cantelli lemma
+P implies that on an event H of probability one, there
+exists T̂4 such that for all T ≥ T̂4 , | Tt=1 rt (π(Xt ), Xt ) − r̄t (π(Xt ), Xt )| ≤ T 3/4 . Then, on
+C ∩ H of probability one, for any T ≥ T̂4 we have
+T
+X
+t=1
+
+r(π(Xt ), Xt ) − rt ≤
+≤
+
+PT
+
+T
+X
+t=1
+
+T
+X
+t=1
+
+r̄(π(Xt ), Xt ) − rt + T 3/4
+r̄(π ∗ (Xt ), Xt ) − rt + T 3/4 .
+
+Thus, limsupT →∞ t=1 r̄(π(Xt ), Xt ) − rt ≤ 0. This ends the proof that the learning rule is
+universally consistent under any C2 process. Now recall that C2 is a necessary condition for
+universal learning by Theorem 4.1. Hence, the set of learnable processes is exactly C = C2
+and the learning rule is optimistically universal.
+5. Countably infinite action space. We next turn to the case where the action space is
+infinite |A| = ∞ but countable. The goal of this section is to show that the set of processes
+admitting universal learning now becomes C1 . This contrasts with the full-feedback setting
+where universal learning is optimistically achievable under C2 processes when a property
+F-TiME on the value space (Y, ℓ) is satisfied [7]. Intuitively, this asks that mean-estimation
+is possible in finite time for any prescribed error tolerance. Of interest to the discussion of
+this section with countable number of actions, [7] showed that countably-infinite classification (Y, ℓ) = (N, ℓ01 ) satisfies the F-TiME property and, their learning rule is universally
+consistent under C2 processes even under noisy and adversarial responses.
+For countable action sets, there is a simple optimistically universal learning rule defined
+as follows. From [20, Lemma 24], because A is countable, the 0 − 1 loss on A is a separable
+metric, thus, there exists a countable set Π of measurable policies π : X → A such that for
+every X ∈ C1 , for every measurable π ⋆ : X → A,
+
+
+⋆
+E inf µ̂X ({x : π(x) 6= π (x)}) ≤ inf E [µ̂X ({x : π(x) 6= π ⋆ (x)})] = 0,
+π∈Π
+
+π∈Π
+
+which implies in particular that almost surely, inf π∈Π µ̂X ({x : π(x) 6= π ⋆ (x)}) = 0. Enumerate Π = {π1 , π2 , . . .}. For any X, we consider the countable set of experts {E1 , E2 , . . .} such
+that Ei,t = πi (Xt ). Our learning rule then applies EXPINF from Corollary 3.5 with this
+family of experts.
+
+T HEOREM 5.1. Let X be a separable Borel-metrizable space and A a countable infinite
+action set. Then, there is an optimistically universal learning rule and the set of learnable
+processes is C = C1 .
+P ROOF. We start by showing that the learning rule defined above is universally consistent
+on any X ∈ C1 process. This proof is essentially identical to that of [22, Theorem 1]. Indeed,
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+denoting by ât the action selected by the learning rule at time t, Corollary 3.5 implies that on
+an event E of probability one, for any π ∈ Π, we have
+T
+
+1X
+rt (π(Xt )) − rt (ât ) ≤ 0.
+T →∞ T
+
+limsup
+
+t=1
+
+Now fix a measurable policy π ⋆ : X → A. For any π ∈ Π, because the rewards lie in [0, 1],
+on E ,
+
+T
+
+1X
+limsup
+rt (π ∗ (Xt )) − rt (ât )
+T →∞ T
+t=1
+
+∗
+
+≤ µ̂X ({x : π(x) 6= π (x)}).
+
+T
+
+1X
+rt (π(Xt )) − rt (ât )
+T →∞ T
+
+≤ µ̂X ({x : π(x) 6= π ∗ (x)}) + limsup
+
+t=1
+
+Also, by construction of the countable set Π, on an event F of probability one, we have
+inf π∈Π µ̂X ({x : π(x) 6= π ⋆ (x)}) = 0. Thus, on E ∩ F , the above inequality shows that
+P
+limsupT →∞ T1 Tt=1 rt (π ∗ (Xt )) − rt (ât ) ≤ 0. Hence, the learning rule is universally consistent under C1 processes with adversarial responses.
+Next, we show that the condition X ∈ C1 is necessary for the existence of a universally
+consistent learning rule, even for function learning. Let X be any process with X ∈
+/ C1 .
+∞ of disjoint measurable subsets of X with
+3.1,
+there
+exists
+a
+sequence
+{B
+}
+By
+Lemma
+i i=1
+S
+Bi = X , and a sequence {Ni }∞
+i=1 in N such that, on a σ(X )-measurable event E0 of
+i∈N
+
+probability strictly great than zero,
+
+T
+
+1X
+1[|X<t ∩ Bit | < Nit ] > 0,
+T →∞ T
+
+limsup
+
+t=1
+
+where it is the unique i ∈ N with Xt ∈ Bi .
+Next, we define the function f ⋆ . Enumerate A = {a1 , a2 , . . .}, and for each i ∈ N, let Ai =
+{a1 , . . . , a2Ni }. For each i ∈ N, let a⋆i be an element of Ai . Denote by ā = {a⋆i }i∈N . Then for
+each i ∈ N and each x ∈ Bi , define fā⋆ (x, a) = 1[a = a⋆i ]. Also define a⋆i as Uniform(Ai )
+(independent over i and all independent of X and the randomness of the learning rule), and
+ā = {a⋆i }i∈N . Then for any learning rule fˆt , denoting by ât its actions when f ⋆ = fā⋆ is as
+constructed above, we have
+#
+"
+
+T 
+1X
+sup rt (a) − rt (ât ) ā = ā
+sup E limsup
+ā
+T →∞ T t=1 a∈A
+#
+"
+T
+1X
+1[ât 6= ait ] ā = ā
+= sup E limsup
+ā
+T →∞ T t=1
+#
+"
+T
+1X
+1[ât 6= ait ]
+≥ E limsup
+T →∞ T t=1
+"
+#
+T
+1X
+1[|X<t ∩ Bit | < Nit ] 1[ât 6= ait ] .
+≥ E 1E0 · limsup
+T →∞ T
+t=1
+BLANCHARD, HANNEKE, AND JAILLET
+
+By the law of total expectation, this last expression above equals
+##
+"
+"
+T
+1X
+1[|X<t ∩ Bit | < Nit ] 1[ât 6= ait ] X, fˆ· ,
+E 1E0 · E limsup
+T →∞ T
+t=1
+
+where conditioning on fˆ· indicates we condition on the independent randomness of the learning rule. Since the average is bounded for any fixed T , Fatou’s lemma, together with the fact
+that 1[|X<t ∩ Bit | < Nit ] is σ(X)-measurable, imply the expression above is at least as large
+as
+#
+"
+T
+
+
+1X
+1[|X<t ∩ Bit | < Nit ] P ât 6= ait X, fˆ· .
+(11)
+E 1E0 · limsup
+T →∞ T
+t=1
+
+Let N̂t = |X≤t ∩ Bit | and Ât = {ât′ : t′ ≤ t, it′ = it }. Note that, conditioned on fˆ· and
+N̂t
+X, the probability that ait ∈ Ât is at most N̂t |A1i | = 2N
+. In particular, this implies that if
+it
+t
+N̂t ≤ Ni , the conditional probability (given fˆ· and X) that ât 6= ai is at least 1 − N̂t ≥ 1 .
+t
+
+t
+
+Thus, (11) is no smaller than
+"
+(12)
+
+2Nit
+#
+T
+1X
+E 1E0 · limsup
+.
+1[|X<t ∩ Bit | < Nit ] ·
+T →∞ T
+t=1
+
+By definition of the event E0 , there is a nonzero probability that
+T
+
+1X
+1[|X<t ∩ Bit | < Nit ] > 0,
+T →∞ T
+
+1E0 · limsup
+
+t=1
+
+and since the quantity on the left hand size is non-negative, this further implies the expectation
+in (12) is also strictly greater than zero.
+Altogether, this implies there exists a (non-random) choice of ā such that, choosing f ⋆ =
+⋆
+fā , the actions ât made by the learning rule fˆt satisfy
+"
+#
+T 
+1X
+E limsup
+> 0,
+sup rt (a) − rt (â)
+T →∞ T
+a∈A
+t=1
+
+and since the quantity in the expectation is non-negative, this further implies that for this
+choice of f ⋆ , with non-zero probability,
+
+T 
+1X
+sup rt (a) − rt (â) > 0.
+limsup
+a∈A
+T →∞ T
+t=1
+
+Thus, fˆt is not universally consistent for function learning. Since this holds for any choice of
+learning rule fˆ· , this completes the proof.
+
+6. Uncountable action space. We next consider the case of uncountable action spaces.
+In this section, we assume that A is an uncountable separable Borel metrizable space. In this
+case, we will show that universal consistency is impossible even in the simplest setting where
+rewards are a deterministic, i.e., rt (a) = f ∗ (Xt , a) for some unknown measurable function
+f ∗ : X × A → [0, 1]. The argument is based on a dichotomy depending whether there exists a
+non-atomic probability measure µ on A, i.e., such that for all a ∈ A, we have µ({x}) = 0. If
+this is not the case, we will need the following simple result which states that any stochastic
+process X takes values in a countable set Supp(X) almost surely.
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+L EMMA 6.1. Let X a metrizable separable Borel space such that there does not exist a
+non-atomic probability measure on X . Then, for any random variable X on X there exists
+a countable set Supp(X) ⊂ X such that almost surely, X ∈ Supp(X). Similarly, for any
+stochastic process X on X there exists a countable set Supp(X) ⊂ X such that almost surely
+∀t ≥ 1, Xt ∈ Supp(X).
+P ROOF. Fix X such a space and let X be a random variable on X . Let Supp(X) = {x ∈
+X : P[X = x] > 0}. Suppose by contradiction that P[X ∈
+/ Supp(X)] > 0 and denote E the
+corresponding event. Because P[E] > 0 we can consider a random variable Y ∼ X|E . For
+instance take (Xi )i≥1 an i.i.d. process following the distribution of X , fix x0 ∈ X a fixed
+arbitrary instance, and pose
+(
+Xk̂ if {i ≥ 1 : Xi ∈
+/ Supp(X)} 6= ∅, k̂ = min{i ≥ 1 : Xi ∈
+/ Supp(X)},
+Y =
+x0 otherwise.
+Because the first time k such that Xk ∈
+/ Supp(X) is a geometric variable G(1 − P[E]), the
+event F = {∃i ≥ 1 : Xi ∈
+/ Supp(X)} has probability one. We now show that Y is nonatomic. First observe that Y ∈
+/ Supp(X). Then, if x ∈ X ∈
+/ Supp(X), we have
+
+
+X
+[
+P[Xi = x] = 0.
+P[Y = x] = P[{Y = x} ∩ F] = P[{Xk̂ = x} ∩ F] ≤ P  {Xi = x} ≤
+i≥1
+
+i≥1
+
+where in the first equality we used the fact that P[F c ] = 0. Therefore Y is non-atomic which
+contradicts the hypothesis on X . As a result, almost surely X ∈ Supp(X). It now suffices to checkP
+that Supp(X) is countable, which is guaranteed by the identity 1 = P[X ∈
+Supp(X)] = x∈Supp(X) P[X = x], since each term of the sum is positive. This ends the
+proof of the first claim.
+S
+Now let X be a stochastic process on X and define Supp(X) = t≥1 Supp(Xt ). Then
+Supp(X) is countable as countable union of countable sets and
+X
+X
+P[∃t ≥ 1 : Xt ∈
+/ Supp(X)] ≤
+P[Xt ∈
+/ Supp(X)] ≤
+P[Xt ∈
+/ Supp(Xt )] = 0.
+t≥1
+
+t≥1
+
+This ends the proof of the lemma.
+
+We are now ready to show that no process admits universal learning when the action set is
+uncountable.
+T HEOREM 6.2. If A is an uncountable separable Borel metrizable space, then there does
+not exist any X admitting universal consistency for measurable function learning.
+P ROOF. Fix a learning rule f· and for any a∗ ∈ A, we define the reward function
+1[a = a∗ ] for x ∈ X , a ∈ A. We also define the policy πa∗ : x ∈ X 7→ a∗ ∈ A.
+We first consider the case where there exists a non-atomic probability measure µ on A. Then,
+for any t ≥ 1, and consider the case where a∗ is sampled from the distribution µ independently from the process X and the randomness of the learning rule. Then we have
+fa∗∗ (x, a) =
+
+Pa∗ ∼µ [ft (X<t , (0)<t , Xt ) = a∗ ] = EX,ft [Pa∗ ∼µ (ft (X<t , (0)<t , Xt ) = a∗ )] = 0.
+T
+Denote by Et this event. Then, by the union bound, P[ t≥1 Et ] = 1. The law of total probability implies that there exists a deterministic choice of a∗ such that
+P[∀t ≥ 1, ft (X<t , (0)<t , Xt ) 6= a∗ ] = 1,
+BLANCHARD, HANNEKE, AND JAILLET
+
+where the probability is taken over X and the randomness of the learning rule.
+Now suppose that there does not exist non-atomic probability measures on A. From
+Lemma 6.1, for any probability measure µ on A, we can construct a countable set Supp(µ) ⊂
+X such that µ(Supp(µ)) = 1. Now consider the set
+[
+S=
+Supp(ft (X≤t−1 , (0)≤t−1 , Xt )).
+t≥1
+
+Then, S is countable as the union of countable sets. Since A is uncountable, let a∗ ∈ A\S . By
+construction, on an event of probability one, for all t ≥ 1, we have ft (X≤t−1 , (0)≤t−1 , Xt ) 6=
+a∗ .
+In both cases, we found an action a∗ ∈ A such that on an event E of probability one over X
+and the randomness of the learning rule, having received 0 reward in the past history at time
+step t, the learning rule does not select a∗ , hence receives reward 0 at time t as well. Thus,
+by induction, denoting by ât the action selected by the learning rule at time t for reward fa∗∗ ,
+we have E ⊂ {∀t ≥ 1, ât 6= a∗ }. Thus, on E ,
+T
+
+1X
+rt (π ∗ (Xt )) − rt (ât ) = 1.
+T
+T →∞
+
+limsup
+
+t=1
+
+Because E has probability one, this shows that f· is not universally consistent.
+7. Universal learning under continuity assumptions. In Section 6 we showed that
+for general uncountable separable metric actions spaces, without further assumptions on the
+rewards, one cannot achieve universal consistency. The goal of this section is to show that
+adding mild continuity assumptions on the rewards enables to significantly enlarge the set of
+processes admitting universal learning.
+7.1. Continuous rewards. In this section, we suppose that the rewards are continuous
+as defined in Definition 2.2, and show that universal consistency on C1 processes is still
+achievable. For bounded separable metric action spaces (Ã, ˜
+d), [20] showed that there is
+countable set of measurable policies Π such that for any measurable π ∗ : X → Ã and X ∈ C1 ,
+"
+#
+T
+1X˜ ∗
+inf E limsup
+d(π (Xt ), π(Xt )) = 0.
+π∈Π
+T →∞ T
+t=1
+
+In general, the action space (A, d) is unbounded, however, (A, d ∧ 1) is a separable bounded
+metric space on which we can apply the above result. This provides a countable set of measurable policies Π such that for any measurable π ∗ : X → A and X ∈ C1 ,
+#
+"
+T
+1X˜ ∗
+d(π (Xt ), π(Xt )) ∧ 1 = 0.
+inf E limsup
+π∈Π
+T →∞ T
+t=1
+
+From this observation, we can get the following lemma.
+
+L EMMA 7.1. Let X be a separable metrizable Borel space and (A, d) be a separable
+metric space. For any measurable function π ∗ : X → A, on an event of probability one, for
+all i ≥ 1, there exists π i ∈ Π such that
+T
+
+1X
+limsup
+1[d(π∗ (Xt ), πi (Xt )) ≥ 2−i ] ≤ 2−i ,
+T →∞ T
+t=1
+
+P
+for all i ≥ 1, T1 t≤T rt (π i (Xt )) − r̄t (π i (Xt )) → 0 and similarly for π ∗ .
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+P ROOF. By construction of the countable set of policies Π, for any i ≥ 1, there exists
+
+π i ∈ Π such that
+
+#
+T
+1X
+E limsup
+d(π ∗ (Xt ), π i (Xt )) ∧ 1 ≤ 2−3i .
+T →∞ T
+"
+
+t=1
+
+Then, Markov’s inequality implies that with probability at least 1 − 2−i .
+T
+
+1X
+d(π ∗ (Xt ), π i (Xt )) ∧ 1 ≤ 2−2i .
+T
+T →∞
+
+limsup
+
+t=1
+
+Applying Markov’s inequality a second time, we obtain
+T
+
+T
+
+t=1
+
+t=1
+
+1X
+1X
+1[d(π∗ (Xt ), πi (Xt )) ≥ 2−i ] ≤ 2i limsup
+d(π ∗ (Xt ), π i (Xt )) ∧ 1 ≤ 2−i .
+T
+T
+T →∞
+T →∞
+
+limsup
+
+The Borel-Cantelli lemma implies that on an event
+P E of probability one, for i sufficiently
+large, there exists π i ∈ Π with limsupT →∞ T1 Tt=1 1[d(π ∗ (Xt ), π i (Xt )) ≥ 2−i ] ≤ 2−i .
+Clearly, this implies that this is the case for all
+i ≥ 1. For any i ≥ 1, Azuma’s inequality
+√
+−2i
+T
+implies that with probability at least 1 − 4e
+, we have
+T
+X
+t=1
+
+i
+
+i
+
+rt (π (Xt )) − r̄t (π (Xt )) ,
+√
+
+T
+X
+t=1
+
+rt (π ∗ (Xt )) − r̄t (π ∗ (Xt )) ≤ 2iT 3/4 .
+
+Because T ≥1 i≥1 e−2i T < ∞, the Borel-Cantelli lemma implies that on an event F of
+P
+probability one, for all i ≥ 1, T1 t≤T rt (π i (Xt )) − r̄t (π i (Xt )) → 0 and similarly for π ∗ .
+Therefore, on the event E ∩ F of probability one, all events are satisfied, which ends the
+proof of the lemma.
+P
+
+P
+
+Using Lemma 7.1, we will show that the EXPINF algorithm over the set of policies Π is
+optimistically universal for continuous rewards.
+T HEOREM 7.2. Let (A, d) be an infinite separable metric space. Then, EXPINF is optimistically univesal for continuous rewards and the set of learnable processes for continuous
+rewards is C c = C1 .
+P ROOF. We start by showing that EXPINF is universally consistent under continuous
+rewards under C1 processes. Let X ∈ C1 and continuous rewards (rt )t and let π ∗ : X → A be
+measurable policy. We denote E the event on which the guarantee for EXPINF of Corollary
+3.5 holds. For convenience, we also note ât the action selected by the learning rule at time t.
+For any x ∈ X , and ǫ > 0, we define
+∆ǫ (x) =
+
+sup
+a∈A:d(a,π ∗ (x))≤ǫ
+
+|r̄(a, x) − r̄(π ∗ (x), x)|.
+
+Next, fix δ > 0, and for any ǫ > 0, let A(ǫ, δ)
+T= {x ∈ X : ∆ǫ (x) ≥ δ}. Note that for any
+x ∈ X , by continuity of r̄(·, x), for any δ > 0, ǫ>0 A(ǫ, δ) = ∅. By Lemma 7.1, on an event
+F of probability one, for any i ≥ 1, there exists π i ∈ Π such that
+T
+
+1X
+limsup
+1[d(π∗ (Xt ), πi (Xt ) ≥ 2−i ] ≤ 2−i ,
+T →∞ T
+t=1
+BLANCHARD, HANNEKE, AND JAILLET
+
+1 P
+
+T
+
+i
+i
+∗
+t≤T rt (π (Xt ) − r̄t (π (Xt )) → 0 and similarly for π . As a result, on F , for any i ≥ 1,
+
+1X
+rt (π ∗ (Xt ), Xt ) − rt (π i (Xt ), Xt )
+T
+T →∞
+
+limsup
+
+t≤T
+T
+T →∞
+
+≤ µ̂X (A(2−i , δ)) + 2−i + limsup
+
+X
+
+t≤T,
+d(π ∗ (Xt ),π i (Xt ))<2−i
+∆2−i (Xt )<δ
+
+r̄t (π ∗ (Xt ), Xt ) − r̄t (π i (Xt ), Xt )
+
+≤ µ̂X (A(2−i , δ)) + 2−i + δ.
+
+Because X ∈ C1 and A(2−i , δ) ↓ ∅, on an event G(δ) of probability one, weThave that
+µ̂X (A(2−i , δ)) −→ 0. Last, let δj = 2−j for any j ≥ 0. On the event E ∩ F ∩ j≥0 G(δj )
+i→∞
+
+of probability one, combining Corollary 3.5 together with the above inequality implies that
+for any j ≥ 0,
+1X
+limsup
+rt (π ∗ (Xt ), Xt ) − rt (ât , Xt ) ≤ δj .
+T
+T →∞
+t≤T
+
+1 P
+
+Thus, limsupT →∞ T t≤T rt (π ∗ (Xt ), Xt )−rt (ât , Xt ) ≤ 0 (a.s.), which shows that EXPINF
+is universally consistent under X for stationary rewards. This ends the proof of the theorem.
+We now show that C1 is necessary for universal consistency. The proof is analogous to that
+of Theorem 5.1 in which we proved that for unrestricted rewards on countably infinite action
+sets, C1 is necessary for universal learning. Suppose that X ∈ C1 and let f· be a learning rule.
+Using the same arguments, there exist a partition of X in measurable sets {Bi }i≥1 and a
+sequence {Ni }i≥1 of integers such that with non-zero probability,
+T
+
+1X
+1[|X<t ∩ Bit | < Nit ] > 0,
+limsup
+T →∞ T
+t=1
+
+where it is the index such that Xt ∈ Bi . As in the original proof, let {ai , i ≥ 1} be a
+sequence of distinct actions and let Ai = {a1 , . . . , a2Ni } for i ≥ 1. We also define ǫi =
+mina6=a′ ∈Ai d(a, a′ ) the minimum distance within Ai actions. For any sequence ā = {a∗i }i∈N
+where a∗i ∈ Ai for i ≥ 1, we define a deterministic reward rā∗ with
+
+
+2d(a, a∗i )
+∗
+,0 ,
+rā (a, x) = max 1 −
+ǫi
+
+for any x ∈ Bi , which defines a proper measurable continuous reward. We also define the
+rewards r̃ā∗ (a, x) = 1[a = a∗i ] for a ∈ A and x ∈ Bi . We now define the learning rule f˜·
+which at each step t computes the action â chosen by the learning rule f· , selects the action
+index with Xt ∈ Bi , receives a reward
+ãt := argmina′ ∈Ai d(â, a′ ) wherei ≥ 1 is the unique
+
+
+rt , then reports the reward max 1 − 2d(â,ã)
+ǫi , 0 , which will be then used by f· for future
+action selections. Note that on Bi , the rewards rā∗ were defined so that they are identically
+zero outside of the balls Bd (a, ǫi ) for a ∈ Ai . These are disjoint, so the report of reward given
+by f˜· to its internal run of f· coincides exactly with what f· would have received by selecting
+action â instead of ã. Further, one can observe that selecting one of the nearest element within
+Ai always increases the reward because the balls Bd (a, ǫi ) for a ∈ Ai are disjoint. Therefore,
+f˜· always receives higher reward than f· at any step. Now observe that f˜· always observes a
+reward in {0, 1}. Hence, for any choice of ā, at any step t, f˜t has the same rewards on rā∗ as
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+it would have obtained on the rewards r̃ā∗ . Therefore,
+
+
+T 
+T 
+1X
+1X
+∗
+∗
+∗
+∗
+limsup
+sup rā,t (a) − rā,t (ât ) ≥ limsup
+sup rā,t (a) − rā,t (ãt )
+T →∞ T
+a∈A
+T →∞ T
+a∈A
+t=1
+
+t=1
+
+
+T 
+1X
+∗
+∗
+sup r̃ā,t
+(a) − r̃ā,t
+(ãt ) ,
+T →∞ T
+a∈A
+
+= limsup
+
+t=1
+
+where ât (resp. ãt ) denotes the action selected by f· (resp. f˜· ) at time t. However, the proof of
+exists a choice
+Theorem 5.1 precisely
+ of ā such that with non-zero probabilP shows that there
+∗ (a) − r̃ ∗ (ã ) > 0. Now observe that the measurable
+ity, limsupT →∞ T1 Tt=1 supa∈A r̃ā,t
+ā,t t
+function π(x) = a∗i where x ∈ Bi always selects the best action. This show that f· is not con/ C c and completes
+sistent on rewards rā∗ , hence not universally consistent. This shows that X ∈
+the proof of the theorem.
+7.2. Uniformly-continuous rewards. In the last section, we showed that adding a continuity constraint on the rewards allowed to learn C1 processes even when the action space A
+is infinite. Unfortunately, this additional assumption on the rewards is not sufficient to obtain
+universal consistency on the more general class of processes C2 . In this section, we strengthen
+the assumptions on the rewards and suppose that they are uniformly-continuous in the actions
+as per Definition 2.2.
+We start by giving necessary conditions for uniformly-continuous rewards. To do so, we
+will need the following simple reduction, showing that some necessary conditions provided
+in the unrestricted rewards case can be used in the uniformly-continuous setting as well.
+L EMMA 7.3. Let (A, d) be a separable metric space. Let S ⊂ A such that we have
+mina,a′ ∈S d(a, a′ ) > 0. Then, C uc (A) ⊂ C(S).
+P ROOF. Intuitively, we restrict the problem on A to the actions S . Formally, let η =
+′
+′
+3 mina,a ∈S d(a, a ) and observe that any reward function r : S → [0, r̄] can be extended to a
+
+uniformly-continuous function F (r) : X → A as follows.
+
+
+′
+′ r̄
+F (r)(a) = max 0, max
+r(a ) − d(a, a )
+,
+a′ ∈S
+η
+
+a ∈ A.
+
+Note that this function is ηr̄ −Lipschitz, hence uniformly-continuous—in the case where rewards are stochastic, we can still apply this transformation at the realization-level. Further,
+the sets Bd (a′ , η) for a′ ∈ S are all disjoint by triangular inequality. Thus, for all a′ ∈ S , we
+have F (r)(a′ ) = r(a′ ). We now describe the reduction from uniformly-continuous rewards
+on A to unrestricted rewards on S . Let X ∈ C(A) and we denote by ât the action selected at
+time t by an universally consistent learner f· under X for uniformly-continuous rewards on
+A. We now construct a learning rule for unrestricted rewards on S . First, for a ∈ A, denote
+by N NS (a) = argmina′ ∈S d(a, a′ ) the index of the nearest neighbor of a in S where ties
+are broken arbitrarily, e.g., by lexicographic order (necessarily, S is countable because A is
+separable). We consider the learning rule which selects the actions N NS (ât ), i.e.,
+ftS (x≤t−1 , r ≤t−1 , xt ) = N NS (ft (x≤t−1 , r ≤t−1 , xt ))
+
+for all x≤t ∈ X t and r≤t−1 ∈ [0, r̄]t−1 . We aim to show that f·S is universally consistent
+under X for unrestricted rewards on S . Fix any reward mechanism r on the action space S .
+We consider the reward mechanism r̃ on the action space A as follows,
+r̃t (a, x) = F (r(· | x))(a),
+BLANCHARD, HANNEKE, AND JAILLET
+
+for any a ∈ A. Note that the mechanism r̃ only depends on the nearest neighbor of selected
+actions. Denote ãt the corresponding selected action. Observe that by construction of the
+functional F , for any t ≥ 1, r̃t (ãt ) ≥ r̃t (ât ). Thus, by monotonicity, f·S is also consistent on
+reward mechanism r̃ . Now note that f˜· only selects actions within S and receives the same
+rewards that would have been observed by running the learning rule on reward mechanism
+r . As a result, f·S is also consistent for reward r . This ends the proof that it is universally
+consistent under X and hence X ∈ C(S). This ends the proof of the proposition.
+As a direct consequence of Lemma 7.3 and the results from previous sections, we can
+use the necessary conditions from the unrestricted reward setting by changing the terms “finite action set” (resp. “countably infinite action set”) into “totally-bounded action set” (resp.
+“non-totally-bounded action set”).
+C OROLLARY 7.4. Let A be a non-totally-bounded metric space. Then, C uc ⊂ C1 . Let A
+be a totally-bounded metric space with |A| > 2. Then, C uc ⊂ C2 .
+We now turn to sufficient conditions and show that we can recover the results from the
+unrestricted case as well. For non-totally-bounded value spaces, the EXPINF learning rule
+from Theorem 7.2 is already universally consistent under C1 processes, which is a necessary
+condition by Corollary 7.4. As a result, imposing the uniformly-continuous assumption on
+the rewards does not improve the set of learnable processes.
+T HEOREM 7.5. Let X be a separable Borel metrizable space and A a non-totallybounded metric space. Then, C uc = C1 .
+Next, we consider totally-bounded actions spaces and generalize the learning rule for
+stochastic rewards in finite action spaces. Recall that this learning rule associates to each
+time a category p = C ATEGORY (t), based on the number of previous occurrences of Xt , and
+works separately on each category. Within each category, the algorithm balances between
+two strategies: strategy 0 which uses independent EXP3 learners for each distinct instance,
+and strategy 1 which performs EXPINF. We adapt the algorithm in the following way. First,
+the EXP3 learners from strategy 0 search for the best action within A(δp ), an δp −net of A
+where δp will be defined carefully. Note that since A is possibly infinite, restricting strategy 0
+to finite action sets is necessary. However, we aim for arbitrary precision, hence we will have
+δp → 0 as p → ∞. Second, for strategy 1, we use the countable set of functions Π defined as
+for the EXPINF algorithm in Theorem 7.2.
+T HEOREM 7.6. Let A be a totally-bounded metric space. Then, there exists an optimistically universal learning rule for stationary and uniformly-continuous rewards, and learnable
+processes are C uc = C2 .
+P ROOF. We first define the new learning rule. C ATEGORY and A SSIGN P URPOSE are left
+unchanged. We will use the countable set of policies Π = {π l , l ≥ 1} as in the continuous case in Lemma 7.1, for E XPLORE (1; ·), and Algorithm 5. Further, in E XPLORE (0; ·)
+and Algorithm 5, EXP3A is replaced by EXP3A(δp ) . Finally, in S ELECT S TRATEGY, ηp =
+√
+√
+|A| ln |A|
+|A(δp )| ln |A(δp )|
+is replaced by ηp = 10
+, where we will define δp shortly. In the
+10 2p/4
+2p/4
+original proof of the universal consistence of the algorithm, √
+we showed that the average error
+|A| ln |A|
+
+of the learning rule on category p, Tp is O(ǫ̃p ) where ǫ̃p = 2 2p/4 . Similarly, we now de√
+P
+|A(δp )| ln |A(δp )|
+. A key feature of the proof is that since we had p ǫ̃p < ∞, the
+fine ǫp := 2
+2p/4
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+learner can afford
+P to converge on each set Tp separately. We mimic this behavior by choosing
+δp such that p ǫp < ∞. Precisely, we pose
+δp = min{2−i : |A(2−i )| ln |A(2−i )| ≤ 2p/4 }.
+
+As a result, we obtain directly ǫp ≤ 2−1−p/8 which is summable, and δp → 0 as p → ∞.
+We now show that this learning rule is universally consistent under processes X ∈ C2 by
+adapting the proof of Theorem 4.2. Fix r a reward mechanism. For every ǫ > 0, there exists
+∆(ǫ) such that
+∀x ∈ X , ∀a, a′ ∈ A,
+
+d(a, a′ ) ≤ ∆(ǫ) ⇒ |r̄(a, x) − r̄(a′ , x)| ≤ ǫ.
+
+∀x ∈ X , ∀a, a′ ∈ A,
+
+d(a, a′ ) ≤ δ ⇒ |r̄(a, x) − r̄(a′ , x)| ≤ ǫ(δ).
+
+For every δ > 0, we will also define ǫ(δ) = 2 inf{ǫ > 0 : ∆(ǫ) ≥ δ}. By uniform-continuity,
+ǫ(δ) → 0 as δ → 0 and because of the factor 2, we have
+Now observe that in the original proof, the probabilistic bounds pi (p, q) for 1 ≤ i ≤ 8
+do not depend on the cardinality of the action set. Therefore, on the same event E ∩ F of
+probability one, Eq (3), (4), (5), (6), (7) and (8) hold starting from some time T̂ , for the
+intended values of p, q, T . The only difference, however, is that in strategy 0, we perform
+EXP3 over the restricted action set A(δp ). As a result, for any x ∈ X , we have
+max r̄(a, x) ≥ max r̄(a, x) − ǫ(δp ).
+a∈A
+
+a∈A(δp )
+
+As a result, Eq (3) should be replaced with
+p
+R̂p0 (q) ≥ R̄p∗ (q) − (Tpq+1 ) 8 − 6
+
+|A| ln |A| q+1
+(Tp − Tpq ) − ǫ(δp )|Tp (q)|
+2p/4
+
+p
+
+|A| ln |A| q+1
+(Tp − Tpq ).
+2p/4
+Note that the additional term ǫ(δp )|Tp (q)| is not present in the upper bound because searching
+over A (in R̄p∗ (q)) is always better than searching over A(δp ) (in R̂p0 (q)). Similarly, Eq (4)
+should be replaced with
+p
+|A| ln |A| q+1
+∗
+R̃p (q) ≥ R̄p (q) − 6
+(Tp − Tpq ) − (Tpq+1 )3/4 − Ap (q) − ǫ(δp )|Tp (q)|.
+2p/4
+Similarly, the adapted Eq (9) becomes
+T
+1 + cp
+Rp (T ) ≥ R̄p∗ (T ) −
+|A| ln |A|T 1−1/2 log2 T − p − ǫ(δp )|Tp ∩ {t ≤ T }|.
+2
+Furthering the same bounds, Eq (10) becomes
+p
+Rp (T ) ≥ R̄p∗ (T ) − (33 + 5c) |A| ln |A|T 1−1/2 log2 T − 15ǫp T − 2ǫ(δp )|Tp ∩ {t ≤ T }|.
+R̂p0 (q) ≤ R̄p∗ (q) − (Tpq+1 ) 8 − 6
+
+We are now ready to prove universalP
+consistence of our learning
+P rule. Fix 0 < ǫ < 1, and
+ǫ
+as in the original proof, let p0 such that p≥p0 ǫp < 15 , because p ǫp < ∞. Again, we have
+p
+X≤4 0 ∈ C1 and as a result, we can apply Lemma 7.1. As a result, on an event H of probability
+one, for all ǫ > 0, there exists i(ǫ) ≥ 1 such that 2−i(ǫ) ≤ ∆(ǫ), ǫ and π i(ǫ) ∈ Π such that
+X
+r̄t (π ∗ (Xt )) − r̄t (π i (Xt ))
+limsup
+T →∞ T
+≤4p0
+t≤T,t∈T
+BLANCHARD, HANNEKE, AND JAILLET
+T
+T →∞
+
+≤ limsup
+T →∞ T
+
++ limsup
+
+p
+
+1[d(π∗ (Xt ), πi(ǫ) (Xt ) ≥ 2−i(ǫ) ]
+
+p
+
+(r̄t (π ∗ (Xt )) − r̄t (π i(ǫ) (Xt )))1[d(π ∗ (Xt ), π i(ǫ) (Xt ) ≤ ∆(ǫ)]
+
+X
+
+t≤T,t∈T ≤4 0
+
+X
+
+t≤T,t∈T ≤4 0
+
+≤ 2−i(ǫ) + ǫ ≤ 2ǫ,
+
+where π ∗ denotes the optimal policy. We define the events E, F as in the original proof. In
+the rest of the proof, we will now suppose that the event E ∩ F ∩ H of probability one is
+satisfied. On this event, because the parameter ǫ > 0 was arbitrary in the above derivations,
+gthere exists l0 ≥ 1 (random index) such that
+X
+ǫ
+limsup
+r̄t (π ∗ (Xt )) − r̄t (π l0 (Xt )) ≤ 2p0 +2 .
+T →∞ T
+≤4p0
+t≤T,t∈T
+
+Following the same arguments as in the original proof, for p < p0 , and Tpq sufficiently
+large, we need to adapt the following estimates.
+max R̂pk (q) ≥ R̂pl0 (q)
+
+1≤l≤k(q)
+
+≥ R̄pl0 (q) − (Tpq+1 )7/8
+≥ R̄p∗ (q) − (Tpq+1 )7/8 −
+
+X
+
+(rt (π ∗ (Xt )) − r̄t (π l0 (Xt )))
+
+t∈Tp (q)
+
+≥ R̂p0 (q) − 2(Tpq+1 )7/8 − 3ǫp (Tpq+1 − Tpq ) −
+
+X
+
+t∈Tp (q)
+
+rt (π ∗ (Xt )) − r̄t (π l0 (Xt )).
+
+Then, observe that
+limsup
+
+2(Tpq+1 )7/8 + 3ǫp (Tpq+1 − Tpq ) +
+
+∗
+l0
+t∈Tp (q) rt (π (Xt )) − r̄t (π (Xt ))
+≤ 4ǫp < ηp .
+Tpq+1 − Tpq
+
+q→∞
+
+P
+
+Thus, as in the original proof, starting from some time T̃ , the learning rule always chooses
+strategy 1 over strategy 0 for all categories p ≤ p0 .
+We continue the same arguments to obtain for p < p0 and T ≥ 2p0 T̃ ,
+X
+Rp (T ) − R̄p∗ (T ) ≥ −2p0 T̃ − 16(3 + c)T 15/16 ln T −
+r̄t (π ∗ (Xt )) − r̄t (π l0 (Xt )),
+t≤T,t∈Tp
+
+which yields
+X
+X
+R̄p∗ (T ) − Rp (T ) ≤ p0 2p0 T̃ + 16p0 (3 + c)T 15/16 ln T +
+r̄t (π ∗ (Xt )) − r̄t (π l0 (Xt )).
+p<p0
+
+t≤T
+
+1 P
+
+Noting that limsupT →∞ T t≤T r̄t (π ∗ (Xt )) − r̄t (π l0 (Xt )) ≤ ǫ, from there, the same arguments show that the learning rule is universally consistent.
+As a summary, with the uniform-continuity assumption we could generalize all results from the unrestricted rewards case with the corresponding totally-bounded/non-totallybounded dichotomy on action spaces.
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+8. Unbounded rewards. In this section, we allow for unbounded rewards R = [0, ∞)
+and start with the unrestricted rewards setting—no continuity assumption. Recall that in this
+setting, we assume that for any context x ∈ X and action a ∈ A, the random variable r(a, x)
+is integrable so that the immediate expected reward is well defined.
+When A is uncountable, we showed that even for bounded rewards, no process X admits
+universal learning. Therefore, we will focus on the case when A is finite or countably infinite, and show that C3 determines whether universal consistency is possible. Moreover, a simple variant of EXPINF suffices for optimistically universal learning as follows. Enumerate
+A = {a1 , a2 , . . . , a|A| } (or A = {a1 , a2 , . . .} for countably infinite A) and for any observed
+instance x ∈ X , we run an independent EXPINF where the experts of the sequence are the
+constant policies equal to ai for 1 ≤ i ≤ |A|, i.e., the expert Ei always selects action ai .
+T HEOREM 8.1. Let A be a countable action set with |A| ≥ 2. Then, there is an optimistically universal learning rule and the set of learnable processes admitting universal is
+C3 .
+The fact that C3 characterizes universal learning was already the case in the noiseless fullfeedback setting [6], hence Theorem 8.1 shows that for unrestricted rewards, we can achieve
+universal learning in the partial feedback setting without generalization cost.
+P ROOF. First, even in the full-information feedback setting, X ∈ C3 is known to be necessary for universal consistency [6]. A fortiori in the bandit setting, this condition is still
+necessary C ⊂ C3 .
+We now show that the learning rule defined above is universally consistent under C3 processes. For simplicity, we denote by ât the action selected be the learning rule at time t. Fix
+X ∈ C3 and define S = {x ∈ X : X ∩ {x} 6= ∅} the support of the process. By definition of C3 ,
+almost surely, |S| < ∞. We denote by E this event of probability one. Next, for any x ∈ S ,
+we define T (x) = {t : Xt = x} and let S̃ = {x ∈ S : |T (x)| = ∞} the set of points which
+are visited an infinite number of times. Recall that the learning rule performs an independent
+EXPINF subroutine on the times T (x) for all x ∈ S . As a result, by Corollary 3.5, for any
+x ∈ S̃ , with probability one, for all a ∈ A,
+X
+limsup
+rt (a) − rt (ât ) ≤ 0.
+T →∞ |T (x) ∩ {t ≤ T }|
+t∈T (x),t≤T
+
+Now observe that S̃ is countable. Hence, by the union bound, on an event F of probability
+one, for all x ∈ S̃ and a ∈ A, we have
+X
+X
+1
+rt (a)− rt (ât ) ≤ limsup
+rt (a)− rt (ât ) ≤ 0.
+limsup
+T →∞ |T (x) ∩ {t ≤ T }|
+T →∞ T
+t≤T,t∈T (x)
+
+t≤T,t∈T (x)
+
+In the rest of the proof, we suppose that E ∩F is met. On E , there exists T̂ = 1+max{t : Xt =
+x, x ∈ S \ S̃} such that for any T ≥ T̂ , we have Xt ∈ S̃ . Then, for any policy π ∗ : X → A,
+and T ≥ 1, we have
+T
+X
+
+X
+
+X
+
+rt (a) − rt (ât ).
+
+X
+1X
+rt (π ∗ (Xt )) − rt (ât ) ≤
+limsup
+T
+T
+T →∞
+T →∞
+
+X
+
+rt (a) − rt (ât ) ≤ 0.
+
+t=1
+
+rt (π ∗ (Xt )) − rt (ât ) ≤
+
+X
+
+rt (π ∗ (Xt )) +
+
+x∈S̃ t≤T,t∈T (x)
+
+t≤T̂
+
+As a result, because F is met,
+T
+
+limsup
+
+t=1
+
+x∈S̃
+
+t≤T,t∈T (x)
+BLANCHARD, HANNEKE, AND JAILLET
+
+using the fact that P[E ∩ F] = 1, we proved that the learning rule is universally consistent
+under any C3 process. This ends the proof of the theorem.
+The last remaining question is whether this very restrictive set of processes C3 can be
+improved under the continuity and uniform-continuity assumptions from Definition 2.2.
+Unfortunately, we show that this is not the case for continuous rewards, however, the continuity assumption allows to achieve universal consistence on C3 processes even on uncountable action spaces. Recall that by Theorem 6.2, universal consistency was not achievable for
+uncountable spaces in the unrestricted reward case.
+T HEOREM 8.2. Let X be a separable metrizable Borel space and (A, d) be a separable
+metric space with |A| ≥ 2. Then, there is an optimistically universal learning rule for continuous unbounded rewards and the set of learnable processes for universal learning with
+continuous unbounded rewards is C3 .
+P ROOF. In the case of countable action set A with |A| ≥ 2, Theorem 8.1 already showed
+that C3 is sufficient for universal learning under continuous unbounded rewards. Therefore, it
+remains to show that in the case of uncountable action space, C3 is still sufficient for universal
+learning. More precisely, we will show that the same learning rule which assigns a distinct
+EXPINF learner to each distinct instance of X as defined in Theorem 8.1 is still universally
+consistent under C3 processes. The only difference is that we run the learners EXPINF on a
+dense sequence of actions (ai )i≥1 of the complete action set A which may be uncountable.
+Let X ∈ C3 . We use the same notations as in the original proof of Theorem 8.1 for the support
+S = {x ∈ X : X ∩ {x} 6= ∅}, the event E = {|S| < ∞}, T (x) = {t : Xt = x} for x ∈ S and
+S̃ = {x ∈ S : |T (x)| = ∞}. By Corollary 3.5, for any x ∈ S̃ , with probability one, for all
+i ≥ 1, we have now
+X
+rt (ai ) − rt (ât ) ≤ 0.
+limsup
+T →∞ |T (x) ∩ {t ≤ T }|
+t∈T (x),t≤T
+
+Let a ∈ A and ǫ > 0, because (ai )i≥1 is dense in A and the immediate reward is continuous,
+there exists i(ǫ) such that |r̄(ai(ǫ) ) − r̄(a)| ≤ ǫ. Now observe that by the union bound, for any
+x ∈ S̃ , with probability one, by the law of large numbers one has for all i ≥ 1,
+X
+rt (ai ) −→ r̄t (ai ),
+T →∞
+|T (x) ∩ {t ≤ T }|
+t∈T (x),t≤T
+
+and similarly for a. As a result, for any x ∈ S̃ , with probability one, for any ǫ > 0,
+X
+limsup
+rt (a) − rt (ât )
+T →∞ |T (x) ∩ {t ≤ T }|
+t∈T (x),t≤T
+|T
+(x)
+∩
+{t ≤ T }|
+T →∞
+
+≤ r̄(a) − r̄(ai(ǫ) ) + limsup
+
+X
+
+t∈T (x),t≤T
+
+rt (ai(ǫ) ) − rt (ât )
+
+≤ ǫ.
+
+As a result, we showed that for any x ∈ S̃ , and any a ∈ A, with probability one,
+X
+rt (a) − rt (ât ) ≤ 0.
+limsup
+T →∞ |T (x) ∩ {t ≤ T }|
+t∈T (x),t≤T
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+Now fix π ∗ : X → A a measurable policy. Because S̃ is countable, by the union bound, on an
+event F of probability one, for all x ∈ S̃ , we have
+X
+limsup
+rt (π ∗ (x)) − rt (ât )
+T →∞ T
+t≤T,t∈T (x)
+|T
+(x)
+∩
+{t ≤ T }|
+T →∞
+
+≤ limsup
+
+X
+
+t≤T,t∈T (x)
+
+rt (π ∗ (x)) − rt (ât ) ≤ 0.
+
+Then, the same arguments as in the original proof show that on E ∩ F , for any T ≥ 1, one
+has
+T
+
+X
+1X
+limsup
+rt (π ∗ (Xt )) − rt (ât ) ≤
+limsup
+T
+T
+T →∞
+T →∞
+t=1
+
+x∈S̃
+
+X
+
+t≤T,t∈T (x)
+
+rt (a) − rt (ât ) ≤ 0.
+
+Thus, the learning rule is universally consistent under C3 processes.
+We now show that X ∈ C3 is still necessary for universal learning with continuous rewards.
+For the unrestricted reward case, this was a direct consequence of a result of [6], which we
+now adapt for continuous rewards. First, for any X ∈
+/ C3 , they show that there exists a disjoint
+∞
+measurable partition {Bi }i=1 such that with non-zero probability, |{i : X ∩ Bi 6= ∅}| = ∞ on
+an event E0 . Then, they constructed a sequence of times Ti for i ≥ 1 such that on an event E
+of probability one, for sufficiently large indices i, τi := min{0} ∪ {t : Xt ∈ Bi } ≤ Ti . Now
+fix two distinct actions a0 , a1 ∈ A, let ǫ = d(a03,a1 ) and fix a learning rule f· . We denote by ât
+its selected action at time t. Consider the following rewards
+
+
+
+d(a, aUj )
+(13)
+r U (a, x) = max 0, Ti 1 −
+, x ∈ Bj ,
+ǫ
+
+for any binary sequence U . Now suppose that they were sampled from an i.i.d. sequence of
+Bernouillis B( 21 ), independent of the process X and the randomness of the learning rule. Now
+observe that for any i ≥ 1 such that τi ≤ Ti , with probability at least 12 independently of the
+past, we have âτi ∈
+/ B(aUj , ǫ), which implies maxa∈A rτUi (a) − rτUi (âτi ) ≥ Ti . From there,
+the same arguments as in the original proof show that with probability one, this event occurs
+infinitely often and E is met, which by the law of total probability implies that there exists a
+deterministic choice of values for U = (Uj )j≥1 such that on the corresponding deterministic
+(hence stationary) rewards, the learning rule is not consistent on E0 ∩ E which has non-zero
+probability. This shows that X does not admit universal learning even in the simplest case of
+deterministic continuous rewards.
+Last, we investigate the case of uniformly-continuous unrestricted rewards. Unfortunately,
+the uniform continuity assumption over the immediate expected rewards does not provide
+any advantage over the continuity assumption.
+P ROPOSITION 8.3. Let X be a separable metrizable Borel space and A be a separable
+metric space with |A| ≥ 2. Then, the set of learnable processes for universal learning with
+uniformly-continuous unbounded rewards is C3 .
+P ROOF. It suffices to show that the C3 condition is still necessary for universal learning
+under uniformly-continuous rewards since the sufficiency is guaranteed by Theorem 8.2. We
+adapt the proof of the necessity of C3 in the continuous unbounded reward case. Let X ∈
+/ C3
+and suppose that there exists an universally consistent learning rule f· under X for uniformlycontinuous unbounded rewards. We use the same notations as in the proof of Theorem 8.2. We
+BLANCHARD, HANNEKE, AND JAILLET
+
+now define a sequence
+(Mi )i≥1 recursively such that M1 = 2T1 and for any i ≥ 1, Mi+1 =
+P
+2Ti+1 + 4Ti+1 j≤i Mj . Then, consider the following stochastic rewards
+ 
+
+Mi 1 + d(a,a0 )∧d(a0 ,a1 )
+w.p. 12 ,
+d(a0 ,a1 )
+
+
+x ∈ Bi , i ≥ 1.
+r(a, x) =
+Mi 1 − d(a,a0 )∧d(a0 ,a1 )
+w.p. 12 .
+d(a0 ,a1 )
+
+These rewards are uniformly-continuous because for any x ∈ X , the expected immediate
+reward is r̄(a, x) = 0 for all a ∈ A. Now for u ∈ {0, 1}, define the constant policy π u : x ∈
+X 7→ au ∈ A. Denote by ât the action selected by the learning rule at time t. Because it is
+consistent under the rewards mechanism given by r , using π 0 , π 1 and the union bound, we
+have that almost surely, for any u ∈ {0, 1},
+T
+
+1X
+rt (au , Xt ) − rt (ât , Xt ) ≤ 0.
+T →∞ T
+
+(14)
+
+limsup
+
+t=1
+
+Now recall that on the event E0 of non-zero probability, we have |{i : X ∩ Bi 6= ∅}| = ∞.
+In other terms, |{i : τi > 0}| = ∞. We then define the random sequence of indices (ik )k≥1
+such that on E0c , ik = 0 for all k ≥ 1 and on E0 , the indices are defined recursively such that
+i1 = argmini≥1,τi >0 τi and for k ≥ 1, we have ik+1 = argmini>ik ,τi >0 τi . The argmin are
+well defined because on E0 , all the times τi for i ∈ {j ≥ 1 : τj > 0} are distinct. As a result,
+by construction of the recursion, on E0 , the sequence (ik )k≥1 is an increasing sequence of
+times and for all k ≥ 1, we have
+{i : X<τik ∩ Bi 6= ∅} = {i : 0 < τi < τik } ⊂ {1 ≤ i < ik }.
+
+Now recall that on the event E of probability one, there exists î ≥ 1 such that for any i ≥ î, we
+have τi := min{0} ∪ {t : Xt ∈ Bi } ≤ Ti . Therefore, on E0 ∩ E , letting k̂ = min{k : ik ≥ î},
+we have that for k ≥ k̂ , and u ∈ {0, 1}
+τik −1
+
+X
+t=1
+
+rt (au , Xt ) − rt (ât , Xt ) ≥
+
+X
+
+X
+
+(−2Mi )
+
+i:X<τi ∩Bi 6=∅ t<τik ,Xt ∈Bi
+k
+
+≥ −2
+
+X
+
+Tik Mi
+
+i<ik
+
+Mik
++ Tik .
+Now observe that on the event E0 ∩ E which has non-zero probability, if d(âτik , a0 ) ≥
+≥−
+
+d(a0 ,a1 )
+2
+
+and the reward on Bik at time τik is in its negative alternative, i.e., r(a, x) =
+
+0 )∧d(a0 ,a1 )
+, we have
+Mi 1 − d(a,ad(a
+0 ,a1 )
+
+τi
+
+k
+1 X
+rt (a0 , Xt ) − rt (ât , Xt ) ≥
+τ ik
+τ ik
+
+t=1
+
+
+
+Mik Mik
+−
++ Tik
+2
+
+
+
+≥ 1.
+
+Now by construction, the negative alternative occurs with probability 21 , independently from
+the past history and the complete process X. As a result, for any k ≥ 1, we have
+#
+"
+τik
+d(a0 , a1 )
+1 X
+rt (a0 , Xt ) − rt (ât , Xt ) ≥ 1 | E0 , E, k ≥ k̂, d(âτik , a0 ) ≥
+≥ .
+(15) P
+τ ik
+2
+t=1
+
+CONTEXTUAL BANDITS AND OPTIMISTICALLY UNIVERSAL LEARNING
+Similarly, one can check that on the event E0 ∩ E , if d(âτik , a0 ) < d(a02,a1 ) and the reward on
+Bik at time τik is in its positive alternative, we have
+τik
+
+
+1 Mi Mik
+1 X
+rt (a1 , Xt ) − rt (ât , Xt ) ≥
+−
++ Tik ≥ 1.
+τ ik
+τ ik
+2
+t=1
+
+As a result, the same arguments as above give
+#
+"
+τik
+d(a0 , a1 )
+1 X
+rt (a1 , Xt ) − rt (ât , Xt ) ≥ 1 | E0 , E, k ≥ k̂, d(âτik , a0 ) <
+≥ .
+(16) P
+τ ik
+2
+t=1
+
+Finally, define for any T ≥ 1 the event
+(
+) (
+)
+T
+T
+1X
+1X
+FT =
+rt (a0 , Xt ) − rt (ât , Xt ) ≥ 1 ∪
+rt (a1 , Xt ) − rt (ât , Xt ) ≥ 1 .
+T
+T
+t=1
+
+t=1
+
+We obtain for any k ≥ 1,
+
+P[Fτik | E0 , E, k ≥ k̂]
+
+
+ 
+d(a0 , a1 )
+d(a0 , a1 )
+≥ P Fτik | E0 , E, k ≥ k̂, d(âτik , a0 ) ≥
+| E0 , E, k ≥ k̂
+P d(âτik , a0 ) ≥
+2
+
+
+ 
+d(a0 , a1 )
+d(a0 , a1 )
++ P Fτik | E0 , E, k ≥ k̂, d(âτik , a0 ) <
+| E0 , E, k ≥ k̂
+P d(âτik , a0 ) <
+2
+
+
+
+
+d(a0 , a1 )
+d(a0 , a1 )
+| E0 , E, k ≥ k̂ + P d(âτik , a0 ) <
+| E0 , E, k ≥ k̂
+≥ P d(âτik , a0 ) ≥
+2
+2
+= ,
+where in the second inequality we used Eq (15) and Eq (16). As a result, using Fatou’s lemma
+
+P[Fτik occurs for infinitely many k ≥ 1 | E0 , E] ≥ limsup P[Fτik | E0 , E]
+k≥1
+
+≥
+1
+limsup P[k ≥ k̂ | E0 , E] = ,
+2 k≥1
+where in the last inequality, we used the dominated convergence theorem given that on the
+event E , k̂ < ∞. As a result, we showed that
+#
+"
+T
+1X
+rt (au , Xt ) − rt (ât , Xt ) ≥ 1 | E0 , E ≥ .
+P ∃u ∈ {0, 1}, limsup
+T →∞ T
+t=1
+
+However, because P[E ∩ E0 ] = P[E0 ] > 0, Eq (14) shows that
+"
+#
+T
+1X
+P ∀u ∈ {0, 1}, limsup
+rt (au , Xt ) − rt (ât , Xt ) ≥ 1 | E0 , E = 1,
+T →∞ T
+t=1
+
+which contradicts the previous inequality. This shows that the learning rule was not consistent
+under the rewards (rt )t , hence not universally consistent under X. This shows that C3 is
+necessary for universal learning and completes the proof.
+Funding. This work is being partly funded by ONR grant N00014-18-1-2122.
+BLANCHARD, HANNEKE, AND JAILLET

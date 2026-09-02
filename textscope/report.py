@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Optional
 
+from .calibration import ReferenceStats
 from .stylometry import analyze_style, split_sentences, StyleReport
+from .rewrite import rewrite_text
 
 DISCLAIMER = """\
 WHAT THIS REPORT IS NOT
@@ -28,24 +30,39 @@ def build_report(
     lang: str = "en",
     scorer=None,
     per_sentence_surprisal: bool = True,
+    include_rewrite: bool = True,
+    reference: Optional[ReferenceStats] = None,
 ) -> dict:
     """
     scorer: an optional LocalScorer instance. Omit it to run the
     model-free stylometric analysis only (no torch required).
+
+    include_rewrite: also run the deterministic, rule-based rewrite
+    (textscope.rewrite) and attach it under the "rewrite" key.
+
+    reference: a ReferenceStats built with `textscope calibrate` on a
+    corpus of real papers. When given, document_suggestions and the
+    rewrite's "unresolved" list compare against it by z-score instead of
+    the fixed heuristic thresholds — see stylometry._document_suggestions.
     """
-    style: StyleReport = analyze_style(text, lang=lang)
+    style: StyleReport = analyze_style(text, lang=lang, reference=reference)
     out: dict = {
         "style": style.as_dict(),
+        "document_suggestions": style.document_suggestions,
         "sentences": [
             {
                 "index": f.index,
                 "n_words": f.n_words,
                 "flags": f.flags,
+                "suggestions": f.suggestions,
                 "text": f.text,
             }
             for f in style.sentences
         ],
     }
+
+    if include_rewrite:
+        out["rewrite"] = rewrite_text(text, lang=lang, reference=reference).as_dict()
 
     if scorer is not None:
         doc = scorer.score(text)
@@ -69,9 +86,31 @@ def build_report(
     return out
 
 
-def render_text(report: dict, show_disclaimer: bool = True) -> str:
+def _wrap(text: str, width: int, indent: str) -> list[str]:
+    """Minimal word wrap so long suggestion sentences don't run off screen."""
+    words = text.split()
+    lines: list[str] = []
+    cur = indent
+    for w in words:
+        if len(cur) + 1 + len(w) > width and cur != indent:
+            lines.append(cur)
+            cur = indent + w
+        else:
+            cur = (cur + " " + w) if cur != indent else cur + w
+    if cur.strip():
+        lines.append(cur)
+    return lines
+
+
+def render_text(
+    report: dict, show_disclaimer: bool = True, show_rewrite: bool = True
+) -> str:
     lines: list[str] = []
     add = lines.append
+
+    sentences = report["sentences"]
+    flagged = [e for e in sentences if e["flags"]]
+    lowest = set(report.get("lowest_surprisal_sentences", []))
 
     add("=" * 72)
     add("TEXTSCOPE REPORT")
@@ -94,26 +133,89 @@ def render_text(report: dict, show_disclaimer: bool = True) -> str:
             add(f"  {k:<32} {v}")
 
     add("")
-    add("PER-SENTENCE NOTES")
-    any_flag = False
-    for e in report["sentences"]:
-        bits = []
-        if e["flags"]:
-            bits.append("; ".join(e["flags"]))
-        if "perplexity" in e:
-            bits.append(f"ppl={e['perplexity']}")
-        if not bits:
-            continue
-        any_flag = True
-        add(f"  [s{e['index']:>2}] {e['n_words']:>3}w  {' | '.join(bits)}")
-        add(f"         {e['text'][:88]}{'...' if len(e['text']) > 88 else ''}")
-    if not any_flag:
+    add("SUMMARY")
+    add(f"  {len(flagged)} of {len(sentences)} sentences carry at least "
+        f"one stylometric flag.")
+
+    doc_suggestions = report.get("document_suggestions", [])
+    add("")
+    add("DOCUMENT-LEVEL SUGGESTIONS")
+    if not doc_suggestions:
+        add("  (nothing triggered at the document level)")
+    else:
+        for i, s in enumerate(doc_suggestions, 1):
+            prefix = f"  {i}. "
+            wrapped = _wrap(s, 68, " " * len(prefix))
+            wrapped[0] = prefix + wrapped[0].lstrip()
+            lines.extend(wrapped)
+
+    add("")
+    add("PER-SENTENCE REVIEW")
+    if not flagged and not report.get("lowest_surprisal_sentences"):
         add("  (nothing flagged)")
+    else:
+        for e in sentences:
+            has_flags = bool(e["flags"])
+            is_low_surprisal = e["index"] in lowest
+            if not has_flags and not is_low_surprisal:
+                continue
+
+            header_bits = [f"[s{e['index']:>2}]", f"{e['n_words']}w"]
+            if "perplexity" in e:
+                header_bits.append(f"ppl={e['perplexity']}")
+            if is_low_surprisal:
+                header_bits.append("MOST PREDICTABLE")
+            add("  " + "  ".join(header_bits))
+
+            excerpt = e["text"][:100] + ("..." if len(e["text"]) > 100 else "")
+            add(f"    text:  {excerpt}")
+
+            if e["flags"]:
+                add(f"    flags: {'; '.join(e['flags'])}")
+
+            for s in e.get("suggestions", []):
+                prefix = "    fix:  "
+                wrapped = _wrap(s, 68, " " * len(prefix))
+                wrapped[0] = prefix + wrapped[0].lstrip()
+                lines.extend(wrapped)
+
+            if is_low_surprisal and not e.get("suggestions"):
+                add("    fix:  Predictable to the local model — often "
+                    "generic phrasing. Reread and consider making the "
+                    "claim more specific.")
+
+            add("")
 
     if "lowest_surprisal_sentences" in report:
-        add("")
         idx = ", ".join(f"s{i}" for i in report["lowest_surprisal_sentences"])
         add(f"MOST PREDICTABLE SENTENCES: {idx}")
+        add("  (flagged with MOST PREDICTABLE above; reread them for "
+            "genericness — this is not proof of anything on its own)")
+
+    if show_rewrite and "rewrite" in report:
+        rw = report["rewrite"]
+        add("")
+        add("=" * 72)
+        add("SUGGESTED REWRITE (mechanical fixes applied automatically)")
+        add("=" * 72)
+        add("")
+        add(f"{rw['changed_sentences']} of {rw['total_sentences']} "
+            f"sentences edited.")
+        add("")
+        add(rw["text"])
+        if rw["unresolved"]:
+            add("")
+            add("STILL NEEDS A HUMAN LOOK (not auto-applied — a judgment call):")
+            for i, u in enumerate(rw["unresolved"], 1):
+                prefix = f"  {i}. "
+                wrapped = _wrap(u, 68, " " * len(prefix))
+                wrapped[0] = prefix + wrapped[0].lstrip()
+                lines.extend(wrapped)
+        add("")
+        add("This is a mechanical, rule-based edit — not a paraphrase and "
+            "not a claim that the result reads better. Read it before "
+            "keeping it. Per-sentence diff (original -> edited, with the "
+            "reason for each change) is in --json output under \"rewrite\".")
 
     if show_disclaimer:
         add("")

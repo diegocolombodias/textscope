@@ -67,16 +67,25 @@ def cmd_analyze(args) -> None:
     text = Path(args.path).read_text(encoding="utf-8")
     scorer = _load_scorer(args.model, args.device)
 
-    report = build_report(text, lang=args.lang, scorer=scorer)
+    ref = calibration.ReferenceStats.load(args.reference) if args.reference else None
+
+    report = build_report(
+        text, lang=args.lang, scorer=scorer,
+        include_rewrite=not args.no_rewrite,
+        reference=ref,
+    )
 
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return
 
-    print(render_text(report, show_disclaimer=not args.no_disclaimer))
+    print(render_text(
+        report,
+        show_disclaimer=not args.no_disclaimer,
+        show_rewrite=not args.no_rewrite,
+    ))
 
-    if args.reference:
-        ref = calibration.ReferenceStats.load(args.reference)
+    if ref is not None:
         feats = _doc_features(text, args.lang, scorer)
         z = calibration.z_scores(feats, ref)
         print()
@@ -132,6 +141,8 @@ def main() -> None:
                    help="reference.json from the calibrate command")
     a.add_argument("--json", action="store_true")
     a.add_argument("--no-disclaimer", action="store_true")
+    a.add_argument("--no-rewrite", action="store_true",
+                   help="skip the auto-applied rewrite section")
     a.set_defaults(func=cmd_analyze)
 
     c = sub.add_parser("calibrate", help="build a reference corpus")

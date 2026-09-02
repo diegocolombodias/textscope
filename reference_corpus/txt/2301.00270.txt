@@ -1,0 +1,1219 @@
+N ET E FFECT: Discovery and Exploitation of Generalized
+Network Effects
+Meng-Chieh Lee1 , Shubhranshu Shekhar2 , Jaemin Yoo3 , and Christos Faloutsos1
+Carnegie Mellon University, Pittsburgh, USA
+{mengchil, christos}@cs.cmu.edu
+Brandeis University, Waltham, USA
+sshekhar@brandeis.edu
+KAIST, Seoul, South Korea
+jaemin@kaist.ac.kr
+
+Abstract. Given a large graph with few node labels, how can we (a) identify
+whether there is generalized network-effects (GNE) or not, (b) estimate GNE to
+explain the interrelations among node classes, and (c) exploit GNE efficiently
+to improve the performance on downstream tasks? The knowledge of GNE is
+valuable for various tasks like node classification and targeted advertising. However, identifying GNE such as homophily, heterophily or their combination is
+challenging in real-world graphs due to limited availability of node labels and
+noisy edges. We propose N ET E FFECT, a graph mining approach to address the
+above issues, enjoying the following properties: (i) Principled: a statistical test
+to determine the presence of GNE in a graph with few node labels; (ii) General
+and Explainable: a closed-form solution to estimate the specific type of GNE observed; and (iii) Accurate and Scalable: the integration of GNE for accurate and
+fast node classification. Applied on real-world graphs, N ET E FFECT discovers the
+unexpected absence of GNE in numerous graphs, which were recognized to exhibit heterophily. Further, we show that incorporating GNE is effective on node
+classification. On a million-scale real-world graph, N ET E FFECT achieves over
+7× speedup (14 minutes vs. 2 hours) compared to most competitors.
+
+Keywords: Network Effects, Heterophily Graphs, Node Classification
+Introduction
+
+Given a large graph with few node labels and no node features, how to check whether
+the graph structure is useful for classifying nodes or not? Node classification is often
+employed to infer labels on large real-world graphs. Since manual labeling is expensive
+and time-consuming, it is common that only few node labels are available. For example,
+in a million-scale social network, identifying even a fraction (say 5%) of users’ groups is
+prohibitive, limiting the application of methods that assume many labels are given. Recently, with prevalence of graphs in industry and academia alike, there is a growing need
+among users to know whether these graph structures provide meaningful information
+for inference tasks. Therefore, before investing a huge amount of time and resources
+into potentially unsuccessful experiments, a preliminary test is earnestly needed.
+That is to say, we want to know whether the given graph has generalized networkeffects (GNE) or not. A graph with GNE provides meaningful information through the
+structure that can be used to identify the labels of nodes. For example, “talkative person tends to make friends with talkative ones” denotes homophily, while “teenagers
+
+Meng-Chieh Lee, Shubhranshu Shekhar, Jaemin Yoo, and Christos Faloutsos
+
+Input
+Adjacency
+
+Adjacency
+2400x2400
+
+Output
+
+Label
+2400x6
+
+Label
+
+Strong GNE
+
+Input Output
+Estimated
+Compatibility Matrix
+
+Node ID
+Heterophily
+Compatibility
+
+No GNE
+
+(a) N ET E FFECT _T EST:
+Principled
+
+6x6
+Label ID
+
+(b) N ET E FFECT _E ST:
+Explainable and General
+
+Homophily
+
+(c) N ET E FFECT _E XP:
+Accurate and Scalable
+
+Fig. 1: N ET E FFECT works well, thanks to its three novel contributions: (a) N ETE FFECT _T EST statistically the existence of GNE. (b) N ET E FFECT _E ST explains the
+graph with the X -ophily compatibility matrix. (c) N ET E FFECT _E XP wins and is fast.
+incline to interact with the ones that have opposite gender on social media” denotes heterophily. It is thus important to distinguish which GNE the graph has, i.e., homophily,
+heterophily, or both (which we call “X -ophily”), if there is any. Given c classes, an intuitive way to describe GNE is via a c × c compatibility matrix, which shows the relative
+influence between each class pair. It can be used to explain the graph property, as well
+as be exploited to better assign the labels in the graph.
+However, identifying GNE is commonly neglected in literature: inference-based
+methods assume that the relationship is given by domain experts [4,6]; most graph
+neural networks (GNNs) assume homophily [9,10,24]. Although some previous works
+[14,16,25] use homophily statistics to analyze the given graph, our work has a very
+different direction because of three reasons. First, they are designed to identify the absence of homophily, and thus can not clearly distinguish GNE, which includes different
+non-homophily cases, i.e., heterophily, both, or no GNE. Second, to compute accurate
+statistics, they use all the node labels in the graph, which is impractical during node
+classification. Finally, their analyses rely heavily on the results of GNNs, which means
+in addition to the graph structure, the node features also significantly influence the conclusions of GNE. In contrast, our work aims to answer 3 research questions:
+RQ1. Hypothesis Testing: How to identify whether the given graph has GNE or not,
+with only few labels?
+RQ2. Estimation: How to estimate GNE in a principled way, and explain the graph
+with the estimation?
+RQ3. Exploitation: How to efficiently exploit GNE on node classification with only
+few labels?
+We propose N ET E FFECT, with 3 contributions as the corresponding solutions:
+1. Principled: N ET E FFECT _T EST uses statistical tests to decide whether GNE exists at all. Fig. 1a shows how it works, and Fig. 2 shows its discovery, where many
+large real-world datasets known as heterophily graphs have little GNE.
+2. General and Explainable: N ET E FFECT _E ST explains whether the graph is homophily, heterophily, or X -ophily by precisely estimating the compatibility matrix
+with the derived closed-form formula. In Fig. 1b, it explains the interrelations of
+classes by the estimated compatibility matrix, which implies X -ophily.
+
+N ET E FFECT: Discovery and Exploitation of Generalized Network Effects
+3. Accurate and Scalable: N ET E FFECT _E XP efficiently exploits GNE to perform
+better in node classification. It wins in both accuracy and time on a million-scale
+heterophily graph “Pokec-Gender”, only requiring 14 minutes (Fig. 1c).
+Reproducibility: The code4 and the extended version with appendix5 are made public.
+Background and Related Work
+General GNNs [9,10]
+Het. GNNs [1,3]
+N ET E FFECT
+
+HOLS [4]
+
+BP [6,11]
+
+2.1 Background
+Notation. Let G be an undirected and unweighted graph with n nodes and m edges
+and an adjacency matrix A. Each node i has a unique label l(i) ∈ {1, 2, . . . , c}, where
+c is the number of classes. Let E ∈ Rn×c be the initial belief matrix with the prior
+information, i.e., the labeled nodes. E ik = 1 if l(i) = k, and E ik = 0 if l(i) ̸= k. For
+the nodes without labels, their entries are set to 1/c. H ∈ Rc×c is a row-normalized
+compatibility matrix, where H ku is the relative influence of class l on class u. The
+residual of a matrix around k is Ŷ = Y − k × 1, where 1 is matrix of ones.
+Belief Propagation (BP). FA BP [11] and L IN BP [6] accelerate BP by approximating
+the final belief assignment. In particular, L IN BP approximates the final belief as:
+B̂ = Ê + AB̂ Ĥ,
+(1)
+where B̂ is a residual final belief matrix, initialized with zeros. The compatibility matrix
+H and initial beliefs E are centered around 1/c to ensure convergence. HOLS [4] is a
+BP-based method, which propagates the labels by weighing with higher-order cliques.
+2.2 Related Work
+Table 1 presents qualitative comparison of state-of-the-art approaches against our proposed N ET E FFECT. Notice that only N ET E FFECT fullfills all the specs.
+Table 1: N ET E FFECT matches all specs, Analysis by Homophily Statistics. Many
+while baselines miss one or more. ‘?’ and studies [14,16,25] utilize homophily ratio to measure how common the labels of
+‘N/A’ denote unclear and not applicable.
+the connected node pairs share the same
+class. Our work focuses on very different
+aspects, as discussed in the introduction.
+Node Classification. GCN [9] and
+Property
+APPNP [10] incorporate neighborhood
+1.1. Statistical Test
+" "
+"
+1. Principled
+information to do better predictions and
+1.2. Convergence Guarantee
+" "
+"
+2. Explainable 2.1 Compatibility Matrix Estimation N/A N/A
+"
+assume homophily. M IX H OP [1], GPR3.1 Handle Heterophily
+?
+? ? ""
+3. General
+GNN [3], and H2 GCN [25] make no
+3.2 Handle GNE
+?
+?
+"
+4.1. Linear Complexity
+"
+"""
+assumption of homophily. Nevertheless,
+4. Scalable
+4.2. Thrifty
+" " ? ? "
+H2 GCN requires too much memory and
+thus can not handle large graphs. LINKX [14] introduces multiple large heterophily
+datasets, but it is not applicable to graphs without node features.
+
+Proposed GNE Test
+
+Given a graph with few labels, how can we identify whether the graph has generalized
+network-effects (GNE) or not? In other words, how can we check whether the graph
+structure is useful for inferring node labels? We propose N ET E FFECT _T EST, a statistical approach to identify the presence of GNE in a graph. Applying it to real-world
+graphs, we show that many popular heterophily graphs exhibit little GNE.
+5
+
+https://github.com/mengchillee/NetEffect
+https://arxiv.org/abs/2301.00270
+
+Meng-Chieh Lee, Shubhranshu Shekhar, Jaemin Yoo, and Christos Faloutsos
+
+2 × 105
+Class ID
+
+0.02
+
+F
+1
+Edge Counting
+
+2 × 105
+3
+5
+2
+4
+
+Class ID
+Class ID
+
+Class ID
+P
+
+2 P
+3 P
+
+P
+F
+
+F
+
+6 × 104
+
+4 P
+
+F
+
+P
+
+4 × 104
+
+5 P
+F
+P
+3 × 104
+
+P
+
+P
+
+F
+
+F
+
+P
+
+P
+P
+
+P
+Class ID
+5
+
+(d) “arXiv-Year”: Weak GNE
+
+Class ID
+
+0.05
+
+0.02
+0.01
+0.00
+
+6.8 × 105
+
+F
+
+6.7 × 105
+6.9 × 105
+2
+
+0.02
+
+Edge Counting
+
+6 × 105
+
+F
+
+F
+
+P
+
+P
+
+P
+
+P
+
+P
+3 × 105
+
+2 P
+3 P
+
+P
+
+2 × 105
+
+4 F
+
+P
+
+P
+
+5 F
+P
+P
+3
+5
+2
+4
+
+Class ID
+105
+
+P
+
+P
+P
+Class ID
+5
+
+(e) “Patent-Year”: Weak GNE
+
+Class ID
+2
+
+Class ID
+
+3 × 106
+
+0.05
+0.04
+0.03
+0.02
+
+F
+2
+
+0.01
+0.00
+
+(c) “Twitch”: No GNE
+Edge Counting
+1.3 × 107
+2
+
+9 × 106
+Class ID
+
+p-value Table
+
+1.2 × 107
+1.1 × 107
+
+0.01
+0.00
+
+F
+3.2 × 106
+
+0.05
+
+0.02
+
+p-value Table
+
+3.8 × 106
+
+3.4 × 106
+
+0.04
+0.03
+
+4 × 106
+
+3.6 × 106
+P
+
+4 × 105
+0.00
+
+p-value Table
+1
+
+Edge Counting
+
+0.01
+Class ID
+
+6.6 × 105
+
+0.05
+0.04
+0.03
+
+(b) “Penn94”: No GNE
+
+0.04
+0.03
+
+F
+7 × 105
+p-value Table
+7.1 × 105
+
+0.00
+
+(a) “Genius”: No GNE
+1
+
+0.01
+Class ID
+7.2 × 105
+
+Class ID
+0.03
+
+p-value Table
+
+7.3 × 105
+
+Class ID
+
+3 × 105
+
+7.4 × 105
+
+Class ID
+
+F
+4 × 105
+
+Edge Counting
+
+Class ID
+
+Class ID
+
+Class ID
+0.05
+0.04
+
+Class ID
+
+p-value Table
+
+Class ID
+6 × 105
+
+Class ID
+
+Edge Counting
+
+Class ID
+P
+2
+
+8 × 106
+
+0.03
+0.02
+
+P
+2
+
+0.05
+0.04
+Class ID
+
+0.01
+0.00
+
+(f) “Pokec-Gender”: Strong GNE
+
+Datasets
+Genius
+Penn94
+Twitch
+Patent-Year Pokec-Gender arXiv-Year
+Synthetic
+# of Nodes / Edges / Classes 422K / 985K / 2 42KM / 1.4M / 2 168K / 6.8M / 2 1.3M / 4.3M / 5 1.6M / 22.3M / 2 169K / 1.2M / 5 1.2M / 34.0M / 6
+Edge Homophily
+0.618
+0.470
+0.545
+0.132
+0.425
+0.222
+0.314
+ĥ
+0.080
+0.046
+0.090
+0.000
+0.000
+0.272
+0.245
+GNE
+No GNE
+No GNE
+No GNE
+Heterophily
+Heterophily
+X -ophily
+X -ophily
+
+(g) Homophily statistics of graphs and their GNE.
+
+Fig. 2: N ET E FFECT _T EST works: It discovers that real-world heterophily graphs do
+not necessarily have GNE. For each graph, we report the edge counting on the left
+(not available in practice), and the p-value table output from N ET E FFECT _T EST on the
+right, where “P” denotes the presence of GNE, and “F” denotes the absence of GNE.
+3.1 N ET E FFECT _T EST
+We first provide two main definitions regarding GNE:
+Definition 1. If the nodes with class ci in a graph tend to connect randomly to the
+nodes with all classes 1, . . . , c (with no specific preference), class ci has no GNE.
+Definition 2. If all classes in a graph have no GNE, this graph has no GNE.
+We distinguish heterophily graphs from those with no GNE by the definition. In
+heterophily graphs, the nodes of a specific class are likely to be connected to the nodes
+of other classes, such as in bipartite graphs that connect different classes of nodes. In
+this case, knowing the label of a node gives meaningful information about the labels
+of its neighbors. On the other hand, if a graph has no GNE, knowing the label of a
+node gives no useful information about its neighbors. In other words, the structural
+information of a graph is not useful to infer the unknown labels of nodes.
+Next we describe how we propose to determine the existence or absence of GNE.
+In the inner loop, we need to decide whether class ci (say, “talkative people”), has
+statistically more, or fewer edges to class cj (say, “silent people”). We propose to use
+Pearson’s χ2 test for that. Specifically, given a class pair (ci , cj ), the input to the test
+is a 2 × 2 contingency table containing the counts of edges that connect pairs of nodes
+whose labels are in {ci , cj }. The null hypothesis of the test is:
+Null Hypothesis 1 Edges are equally likely to exist between nodes of the same class
+and those of different classes.
+If the p-value from the test is no less than 0.05, we accept the null hypothesis, which
+represents that the chosen class pair (ci , cj ) exhibits no statistically significant GNE in
+the graph. Then we call them mutually indistinguishable:
+Definition 3 (Mutually indistinguishable). Two classes ci and cj are mutually indistinguishable if we can not reject the null hypothesis above.
+
+N ET E FFECT: Discovery and Exploitation of Generalized Network Effects
+Novel Implementation Details. The detailed procedure of N ET E FFECT _T EST is
+in Appx. B.1. A practical challenge on the test is that if the numbers in the table are
+too large, p-value becomes very small and meaningless [15]. Uniform edge sampling
+can be a natural solution, but sampling for only a single round can be unstable and output very different results. To address this, we combine p-values from different random
+sampling by Universal Inference [23]. We firstly sample edges to add to the contingency
+table until the frequency is above a specified threshold, and compute the χ2 test statistic
+for each class pair. Next, following Universal Inference, we repeat the procedure for
+random samples of edges for B rounds and average the statistics. At last, we use the average statistics to compute the p-value table F c×c of χ2 tests. Our N ET E FFECT _T EST
+is robust to noisy edges thanks to the sampling process, and works well given either a
+few or many node labels. Given a few observations, the χ2 test works well when the
+frequency in the contingency table is at least 5; given many observations, our sampling
+trick ensures the correctness and the consistency of the computed p-value.
+If a class accepts the null hypotheses with all other classes, this class has little GNE,
+and satisfies Def. 1. Moreover, if all classes exhibit little GNE, the whole graph satisfies
+Def. 2. In that case, no label propagation methods will help with node classification.
+3.2
+
+Discoveries on Real-World Graphs
+
+We apply N ET E FFECT _T EST to 6 real-world graphs and analyze their GNE. For each
+dataset, we sample 5% of node labels and compute the p-value table using N ET E F FECT _T EST . This is because a) only few labels are available in most node classification
+tasks in practice, and thus it is reasonable to make the same assumption in the analysis,
+and b) N ET E FFECT _T EST can analyze GNE even from partial observations. B is set to
+1000 to output stable results. Based on Def. 2 our surprising discoveries are:
+Discovery 1 (No GNE) N ET E FFECT _T EST identifies the lack of GNE in “Genius”
+[13], “Penn94” [21], and “Twitch” [18]. They are widely known as heterophily
+graphs. In “Genius” (Fig. 2a), we see that both classes 1 and 2 tend to connect to
+class 1, making class 2 indistinguishable by the graph structure. N ET E FFECT _T EST
+thus accepts the null hypothesis, and identifies the lack of GNE. We can observe a similar phenomenon in “Penn94” (Fig. 2b). “Twitch” (Fig. 2c) used to be considered as a
+heterophily graph because of its weak homophily effect, but N ET E FFECT _T EST finds
+that each of the classes uniformly connects to both classes, and thus it has little GNE.
+Discovery 2 (Heterophily and X -ophily) N ET E FFECT _T EST identifies GNE in “ArxivYear”, “Patent-Year”, and “Pokec-Gender”. While “Patent-Year” and “Pokec-Gender”
+exhibit heterophily (Fig. 2e and 2f), “Arxiv-Year” exhibits X -ophily, i.e., not straight
+homophily or heterophily (Fig. 2d). They are thus used in our experiments.
+Discovery 3 (Weak vs strong GNE) N ET E FFECT _T EST identifies weak, and strong
+GNE: “Arxiv-Year” and “Patent-Year” exhibit weak GNE; and “Pokec-Gender” exhibits strong GNE. We consider graphs to have weak GNE if there exists at least one
+class which is not distinguishable from some other classes. Such graphs limit the accuracy of node classification, compared with graphs with strong GNE (i.e., all classes
+have GNE), regardless of the specific method used for classification.
+Discussion of Homophily Statistics. In Fig. 2g, we report two homophily statistics.
+Edge homophily [25] is the edge ratio that connect two nodes with the same class, and
+ĥ [14] is an improved metric which is insensitive to the class number and size. We find
+Meng-Chieh Lee, Shubhranshu Shekhar, Jaemin Yoo, and Christos Faloutsos
+
+even using all labels, they are not enough to capture the interrelations of all class pairs in
+detail, and the graphs with low homophily statistics are not guaranteed to be heterophily.
+They can only detect the absence of homophily, instead of distinguishing different nonhomophily cases, including heterophily, X -ophily, and no GNE. In contrast, our N ETE FFECT _T EST identifies whether the graph exhibits GNE or not from only a few labels.
+Proposed GNE Estimation
+
+Given that a graph exhibits GNE, how can we estimate the all-pair relations between
+classes? A compatibility matrix is a natural strategy to describe the relations, which
+has been widely used in the literature. We propose N ET E FFECT _E ST, which turns the
+compatibility matrix estimation into an optimization problem based on a closed-form
+formula. N ET E FFECT _E ST not only overcomes the limitation of naive edge counting,
+but is also robust to noisy observations even with few observed labels.
+4.1 Why NOT Edge Counting
+The graph in Fig. 3a exhibits heterophily between class pairs (1, 2) and (3, 4), while
+it exhibits homophily in classes 5 and 6. A compatibility matrix is commonly used in
+existing studies, but assumed given by domain experts, instead of being estimated. A
+naive way to estimate it is via counting labeled edges, but it has two limitations: 1) rare
+labels are neglected, and 2) it is noisy or biased due to few labeled nodes. The result
+is even more unreliable if the given labels are imbalanced. In Fig. 3, we upsample the
+training labels 10× for class 1 using the graph in Fig. 1b. Edge counting in Fig. 3b
+biases towards the upsampled class and clearly fails to estimate the correct compatibility matrix in Fig. 3a, while our proposed N ET E FFECT _E ST succeeds in Fig. 3c. This
+commonly occurs in practice, since we observe only limited labels, and becomes fatal
+if the observed distribution is different from the true one.
+4.2 Closed-Form Formula
+We begin the derivation by rewriting Eqn. 1 of BP. The main insight is reminiscent of
+‘leave-one-out’ cross validation. That is, we find Ĥ that would make the results of the
+propagation (RHS of Eqn. 2) to the actual values (LHS of Eqn. 2):
+(2)
+Ê ≈ A
+{zĤ}
+|{z}
+| Ê
+reality
+
+estimate
+
+Formally, we want to minimize
+the difference
+between the reality and the estimate:
+c
+X c
+X
+X X
+min
+∥Ê iu −
+Ê jk Ĥ ku ∥2 ,
+(3)
+Ĥ
+
+i∈P u=1
+
+k=1 j∈N (i)∩P
+
+where N (i) denotes the neighbors of node i. In other words, we aim to minimize the
+difference between initial belief Ê of each node i ∈ P by the ones of its neighbors
+N (i) ∈ P, i.e., N (i) ∩ P. To estimate the compatibility matrix Ĥ, we solve the optimization problem in Eqn. 3 with the proposed closed-form formula:
+Lemma 1 (Network Effect Formula (NEF)). Given adjacency matrix A and initial
+beliefs Ê, the closed-form solution of vectorized compatibility matrix vec(Ĥ) is:
+vec(Ĥ) = (X T X)−1 X T y
+where X = I c×c ⊗ (AÊ) and y = vec(Ê).
+Proof. See Appx. A.1.
+
+(4)
+■
+
+Ground Truth
+
+1.0
+0.8
+0.6
+0.4
+0.2
+
+1 2 3 4 5 6
+
+Class ID
+
+0.0
+
+(a) Ground Truth
+2
+4
+6
+
+Edge Counting
+
+1.0
+0.8
+0.6
+0.4
+0.2
+
+1 2 3 4 5 6
+
+Class ID
+
+0.0
+
+Class ID
+2
+4
+6
+
+Class ID
+
+Class ID
+
+N ET E FFECT: Discovery and Exploitation of Generalized Network Effects
+2
+4
+6
+
+NEF
+
+E
+
+1.0
+
+B 1
+
+0.8
+1
+A
+
+0.6
+0.4
+0.2
+
+1 2 3 4 5 6
+
+Class ID
+
+G
+
+0.0
+
+(b) Edge Counting (c) N ET E FFECT _E ST
+1
+
+D
+
+C
+
+E
+
+F
+
+B 4
+2
+1
+
+A
+G
+7
+2
+
+D
+
+C
+1
+
+F
+
+(a) Adj. Matrix (b) Emphasis Matrix
+
+Fig. 3: N ET E FFECT _E ST handles imbalanced Fig. 4: Emphasis matrix at work:
+it prefers well-connected neighbors.
+case well. Labels of class 1 is upsampled.
+4.3 N ET E FFECT _E ST
+The algorithm is presented in Alg. 1. In practice, we can use any form of adjacency matrix for the estimation. The proposed NEF allows us to estimate the compatibility matrix by solving this optimization problem, but there still exists a practical challenge that
+need to be addressed. With few labels, it is difficult to properly separate them into training and validation sets for the regression, and the estimation can easily be interfered by
+the noisy observations. We thus use ridge regression with leave-one-out cross-validation
+(RidgeCV) instead of the regular linear regression. This allows us to fully utilize the observations without having biases caused by random splits of training and validation sets.
+Moreover, the regularization effect of RidgeCV makes the compatibility matrix more
+robust to noisy observations. It is noteworthy that its computational cost is negligible.
+Algorithm 1: N ET E FFECT _E ST
+Data: Adjacency matrix A, initial belief Ê, and priors P
+Result: Estimated compatibility matrix Ĥ
+1 X ← I c×c ⊗ (AÊ);
+// feature matrix
+2 y ← vec(Ê);
+// target vector
+3 Extract indices i with nodes in priors P;
+4 Ĥ ← RidgeCV (X[i], y[i]);
+5 Return Ĥ;
+Proposed GNE Exploitation
+
+We propose N ET E FFECT _E XP to exploit GNE for accurate and fast node classification
+with few labels. With few labels, it becomes crucial to better utilizing the graph structure. First, we address this by paying attention to influential neighbors by the proposed
+“emphasis” matrix; and then describe N ET E FFECT _E XP with theoretical analysis.
+5.1 “Emphasis” Matrix
+Rationale and Overview. With few priors, we propose to better utilize the graph structure, by paying attention to only the most important part of it. That is to say, not all
+neighbors are equally influential: In Fig. 4, best practice shows that well-connected
+neighbors (i.e., nodes ‘B’, ‘C’, and ‘D’) have more influence on node ‘A’ than the rest.
+Thus, we propose “emphasis” matrix A∗ , to pay attention to such neighbors. N ETE FFECT _E ST can also benefit from it by replacing A with A∗ , where we denote the
+∗
+improved compatibility matrix as Ĥ . Alg. 2 shows the details. In short, it has 3 steps:
+1. Favors influential neighbors by quickly approximating the node-to-node proximity using (non-backtracking) random walks with restarts (lines 2-5);
+2. Touches-up the new node-proximity by applying a series of transformations (including the best-practice element-wise logarithm) on the proximity matrix (line 6);
+Meng-Chieh Lee, Shubhranshu Shekhar, Jaemin Yoo, and Christos Faloutsos
+
+3. Symmetrizes and weighs the adjacency matrix with structural-aware embedding
+(lines 7-8), giving higher weights to neighbors with closer embeddings (line 9).
+Algorithm 2: “Emphasis” Matrix
+Data: Adjacency matrix A, number of trials M , number of steps L, and dimension d
+Result: Emphasis matrix A∗
+′
+1 W ← O n×n ;
+/* approximate proximity matrix by random walk
+
+*/
+
+for node i in G do
+for m = 1, ..., M do
+for j ∈ Wm (i, L) do
+W ′ij ← W ′ij + 1;
+/* masking, degree normalization and logarithm
+
+W n×n ← log (D −1 (W ′ ⊙ A));
+T
+7 U n×d , Σ d×d , V d×n ← SVD(W , d);
+√
+8 U ←
+ΣU ;
+
+*/
+/* boost weights of close-embedded neighbors
+10
+
+Weigh A∗n×n , where A∗ij = S(U i , U j ), ∀{i, j|Aij = 1};
+Return A∗ ;
+
+// embedding
+// scaling
+*/
+
+Proximity Matrix Approximation. We propose to utilize random walks to approximate the proximity matrix. The approximated proximity matrix W ′ij records the times
+we visit node j if we start a random walk from node i. Only the well-connected neighbors will be visited more often. We theoretically show that it converges quickly:
+Lemma 2 (Convergence of Random Walks). With probability 1 − δ, the error ϵ between the approximated and true distributions for a node walking to its 1-hop
+q neighbor
+by random walks of length L with M trials is no greater than ⌈(L−1)/2⌉
+L
+
+log (2/δ)
+2LM .
+
+We can make the convergence even faster by using “non-backtracking” random
+walks [2]. Given the start
+( node s and walk length L, its function is defined as follows:
+wl ∈ N (wl−1 ), ∀l ∈ [1, L]
+W(s, L) = (w0 = s, ..., wL )
+.
+(5)
+wl−1 ̸= wl+1 , ∀l ∈ [1, L − 1]
+Thanks to it, we improve Lemma 2 to have a tighter bound of error ϵ:
+Lemma 3 (Convergence of Non-Backtracking Random Walks). With the same condition as in
+qLemma 2, the error ϵ by non-backtracking random walks is no greater than
+⌈(L−1)/3⌉
+L
+
+log (2/δ)
+2LM .
+
+Proof. See Appx. A.2.
+
+■
+
+Structural-Aware Node Representation. Based on W , we apply a series of transformations to generate better and unbiased representations of nodes in a fast way. An
+element-wise multiplication by A is done to keep the approximation of 1-hop neighbor
+for each node, which is sparse but supplies sufficient information. We use the inverse
+of the degree matrix D −1 to reduce the influence of nodes with large degrees. This
+prevents them from dominating the pairwise distance by containing more elements in
+their rows. The element-wise logarithm rescales the distribution in W , in order to enlarge the difference between smaller structures. We use Singular Value Decomposition
+(SVD) for efficient rank-d decomposition
+√ of sparse W , and multiply the left-singular
+vectors U by the squared eigenvalues Σ to correct the scale.
+
+N ET E FFECT: Discovery and Exploitation of Generalized Network Effects
+“Emphasis” Matrix Construction. Directly measuring the node similarity in the graph
+is not trivial, or may be time consuming (e.g., by counting motifs). Therefore, we
+propose to compute the node similarity via the structural-aware node representations,
+which capture the higher-order information, and construct the “emphasis” matrix A∗
+by weighing A with the node similarity. The intuition is that the nodes that are closer in
+the embedding space are better connected with higher-order structures. The similarity
+function is S(U i , U j ) = e−D(U ik ,U jk ) , where e is the Euler’s number. It is a universal
+law [19], which turns the distance into similarity, and bounds it from 0 to 1. While D
+can be any distance metric, we use Euclidean as it works well empirically.
+5.2 N ET E FFECT _E XP
+The algorithm of N ET E FFECT _E XP is in Appx. B.2. N ET E FFECT _E XP takes as in∗
+put the “emphasis” matrix A∗ , the compatibility matrix Ĥ estimated by A∗ , and the
+initial beliefs Ê. It computes the beliefs B̂ iteratively by aggregating the beliefs of
+neighbors through A∗ until they converge. This reusage of A∗ aims to draw attention
+∗
+to the neighbors that are more structurally important. By exploiting GNE with Ĥ ,
+N ET E FFECT propagates properly in heterophily graphs.
+Convergence Guarantee. To ensure the convergence of N ET E FFECT _E XP, we introduce a scaling factor f during the iterations. A smaller f leads to a faster convergence
+but distorts the results, thus we set f to 0.9/ρ(A∗ ). Its exact convergence is:
+Lemma 4 (Exact Convergence). The criterion for the exact convergence of N ET E F ∗
+FECT _E XP is 0 < f < 1/ρ(A ), where ρ(·) denotes the spectral radius of the matrix.
+Proof. See Appx. A.3.
+
+■
+
+Complexity Analysis. N ET E FFECT _E XP uses sparse matrix representation of graphs
+and scales linearly. Its complexity is:
+Lemma 5. The time complexity of N ET E FFECT _E XP is approximately O(m) and the
+space complexity is O(max (m, n · L · M ) + n · c2 ).
+Proof. See Appx. A.4.
+■
+Experiments
+
+In this section, we aims to answer the following questions:
+Q1. Accuracy: How well does N ET E FFECT work by estimating and exploiting GNE?
+Q2. Scalability: How does the running time of N ET E FFECT scale w.r.t. graph size?
+Q3. Explainability: How does N ET E FFECT explain the real-world graphs?
+Datasets. We focus on large graphs and include 8 graphs with at least 20K nodes. For
+each dataset, we sample only a few node labels for training for five times and report the
+average. “Synthetic” is the enlarged graph in Fig. 1b, which exhibits X -ophily GNE.
+Baselines. We compare N ET E FFECT with five baselines and separate them into four
+groups: General GNNs: GCN [9], APPNP [10]. Heterophily GNNs: M IX H OP [1],
+GPR-GNN [3]. BP-based methods: HOLS [4]. Our proposed methods: N ET E FFECTHom and N ET E FFECT. N ET E FFECT-Hom is N ET E FFECT using identity matrix as compatibility matrix, which assumes homophily and does not handle GNE.
+Experimental Settings. For GNNs, one-hot node degrees are used as the node features,
+as implemented by PyG [5]. Experiments are run on a server with 3.2GHz Intel Xeon
+CPU. Details of the experimental setup are in Appx. C.
+Meng-Chieh Lee, Shubhranshu Shekhar, Jaemin Yoo, and Christos Faloutsos
+
+Table 2: N ET E FFECT wins on X -ophily and Heterophily datasets.
+Dataset
+Synthetic
+Pokec-Gender [20]
+arXiv-Year [8]
+Patent-Year [12]
+# of Nodes / Edges / Classes
+1.2M / 34.0M / 6
+1.6M / 22.3M / 2
+169K / 1.2M / 5
+1.3M / 4.3M / 5
+Label Fraction
+4%
+0.4%
+4%
+4%
+GNE Strength
+Strong X -ophily
+Strong Heterophily
+Weak X -ophily
+Weak Heterophily
+Method
+Accuracy Time (s) Rel. Time Accuracy Time (s) Rel. Time Accuracy Time (s) Rel. Time Accuracy Time (s) Rel. Time
+GCN
+16.7±0.0
+3456
+4.1× 51.8±0.1
+2906
+3.4× 35.3±0.1
+2.5× 26.0±0.0
+2.3×
+APPNP
+18.6±1.1
+7705
+9.2× 50.9±0.3
+6770
+7.8× 33.5±0.2
+8.1× 27.5±0.2
+2050
+5.2×
+M IX H OP
+16.7±0.0 58391
+70.0× 53.4±1.2 53871
+62.1× 39.6±0.1
+2983
+57.4× 26.8±0.1 18787
+47.6×
+GPR-GNN
+18.9±1.2
+7637
+9.1× 50.7±0.2
+6699
+7.7× 30.1±1.4
+7.7× 25.3±0.1
+2034
+5.1×
+HOLS
+46.1±0.1
+1672
+2.0× 54.4±0.1
+8552
+9.9× 34.1±0.3
+10.9× 23.6±0.0
+1.3×
+N ET E FFECT-Hom
+45.6±0.1
+1.0× 56.9±0.2
+1.0× 37.0±0.3
+1.0× 24.3±0.0
+1.1×
+N ET E FFECT
+80.4±0.0
+1.0× 67.3±0.1
+1.0× 38.9±0.1
+1.0× 28.7±0.1
+1.0×
+
+Table 3: N ET E FFECT wins on Homophily datasets.
+Dataset
+Facebook [17]
+GitHub [17]
+arXiv-Category [22]
+Pokec-Locality [20]
+# of Nodes / Edges / Classes
+22.5K / 171K / 4
+37.7K / 289K / 2
+169K / 1.2M / 40
+1.6M / 22.3M / 10
+Label Fraction
+4%
+4%
+4%
+0.4%
+Method
+Accuracy Time (s) Rel. Time Accuracy Time (s) Rel. Time Accuracy Time (s) Rel. Time Accuracy Time (s) Rel. Time
+GCN
+67.0±0.8
+2.0× 81.0±0.6
+2.2× 25.4±0.3
+2.3× 17.3±0.4
+4002
+2.9×
+APPNP
+50.5±2.2
+7.7× 74.2±0.0
+5.6× 19.4±0.6
+1176
+12.3× 16.8±1.7 11885
+8.6×
+M IX H OP
+69.2±0.7
+49.3× 77.8±1.3
+40.5× 33.0±0.6
+3203
+33.4× 16.9±0.3 52139
+37.9×
+GPR-GNN
+51.9±1.5
+7.8× 74.1±0.1
+5.8× 19.7±0.3
+1174
+12.2× 30.0±2.0 11959
+8.7×
+HOLS
+86.0±0.4
+934 155.7× 80.8±0.5
+9.7× 61.4±0.2
+6.5× 63.7±0.3
+8139
+5.9×
+N ET E FFECT-Hom
+85.2±0.5
+1.0× 81.3±0.5
+1.0× 61.7±0.2
+1.0× 66.0±0.2
+1437
+1.0×
+N ET E FFECT
+85.2±0.5
+1.0× 81.3±0.5
+1.0× 58.8±0.6
+1.1× 64.8±0.8
+1377
+1.0×
+
+6.1
+
+Q1 - Accuracy
+
+In Table 2 and 3, we report the accuracy and running time. We highlight the top three
+from dark to light by , and denoting the first, second and third place. In summary,
+N ET E FFECT wins on X -ophily, heterophily and homophily graphs.
+X -ophily and Heterophily. In Table 2, N ET E FFECT outperforms all the competitors
+significantly by more than 34.3% and 12.9% accuracy on “Synthetic” and “PokecGender”, respectively. These graphs exhibit strong GNE, thus N ET E FFECT boosts the
+accuracy owing to precise estimations of compatibility matrix. Heterophily GNNs give
+results close to majority voting when the observed labels are not adequate. With homophily assumption, General GNNs and BP-based methods also not perform well. Both
+“arXiv-Year” and “Patent-Year” have weak GNE (Sec. 3.2). Even so, N ET E FFECT still
+outperforms the competitors by estimating a reasonable compatibility matrix (Fig. 6c).
+Homophily. In Table 3, N ET E FFECT-Hom outperforms all the competitors on 3 out of
+4 homophily graphs, namely “GitHub”, “arXiv-Category” and “Pokec-Locality”, and
+N ET E FFECT performs similarly to N ET E FFECT-Hom. In addition, N ET E FFECT-Hom
+performs competitively with HOLS on “Facebook”, while being 155.7× faster.
+Ablation Study. Our optimizations make a difference. We evaluate different compatibility matrices – (i) N ET E FFECT-EC uses edge counting on the labels of adjacent nodes
+in the priors, and (ii) N ET E FFECT-A uses the adjacency matrix instead of “emphasis”
+matrix as the input of N ET E FFECT _E ST. To evaluate the cases when imbalanced labels
+are given, we upsample 5% labels to the class with the fewest labels in the datasets with
+weak GNE during the estimation. In Table 4, we find that N ET E FFECT outperforms
+all its variants in all datasets. In the graphs with strong GNE, N ET E FFECT shows its
+robustness to the structural noises and gives better results. In the imbalanced graphs,
+while N ET E FFECT-EC brings its vulnerability to light, N ET E FFECT stays with high
+accuracy. This study highlights the importance of a compatibility matrix estimation, as
+well as forming it into an optimization problem as shown in Lemma 1.
+
+N ET E FFECT: Discovery and Exploitation of Generalized Network Effects
+Table 4: Ablation Study: Estimating compatibility Table 5: N ET E FFECT is thrifty.
+matrix by proposed “emphasis” matrix is essential. AWS dollar cost ($) is reported,
+GNE
+Datasets
+N ET E FFECT-Hom N ET E FFECT-EC N ET E FFECT-A N ET E FFECT by t3.small and p3.2xlarge.
+Strength
+
+11x
+
+1.0
+
+1.5
+0.6
+0.4
+0.2
+
+4x
+0.5
+
+1.0
+
+Est. Comp. Matrix
+
+0.8
+
+2000
+Datasets
+N ET E FFECT
+GCN
+Pokec-Gender $ 0.33 (1.0×) $ 12.61 (45.0×)
+Pokec-Locality $ 0.53 (1.0×) $ 13.66 (29.1×)
+
+80.5±0.0
+67.3±0.1
+38.4±0.0
+28.7±0.0
+2.0
+
+# of Edges 1e7
+
+Class ID
+0.0
+
+Class ID
+
+4000
+
+77.4±0.0
+64.8±0.2
+35.7±0.6
+28.7±0.1
+
+Est. Comp. Matrix
+
+UltraProp
+GCN
+HOLS
+
+6000
+
+68.0±0.1
+64.9±0.2
+36.5±1.0
+24.0±0.9
+
+Est. Comp. Matrix
+
+0.8
+0.7
+0.6
+0.6
+0.5
+0.5
+0.4
+0.4
+0.3
+
+0.3
+1
+3
+Class ID
+(a) “Pokec-Gender”: (b) “arXiv-Year”:
+
+0.2
+
+Class ID
+
+77.7±0.0
+56.9±0.1
+37.0±0.3
+24.1±0.0
+
+Class ID
+
+Run Time (s)
+
+Synthetic
+Strong
+Pokec-Gender
+arXiv-Year (imba.)
+Weak
+Patent-Year (imba.)
+1
+3
+Class ID
+0.2
+0.1
+
+(c) “Patent-Year”:
+
+X -ophily
+Heterophily
+Fig. 5: N ET E FFECT is scalable. Heterophily
+It is fast and scales linearly with Fig. 6: N ET E FFECT is explainable. Our estimated
+compatibility matrices are much more robust to
+the edge number.
+noises compared to edge counting (in Fig. 2).
+6.2 Q2 - Scalability
+N ET E FFECT is scalable and thrifty. We vary the edge number in “Pokec-Gender” and
+plot against the running time, including training and inference. In Fig. 5, N ET E FFECT
+scales linearly as expected (Lemma 5). Table 5 shows the estimated AWS dollar cost
+in “Pokec-Gender”, assuming that we use a CPU machine for N ET E FFECT, and a GPU
+one for GCN. N ET E FFECT achieves up to 45× savings. Details in Appx. C.3.
+6.3 Q3 - Explainability
+Fig. 6 shows the compatibility matrices that N ET E FFECT recovered. In a nutshell, the
+results agree well with the intuition. For “Synthetic”, N ET E FFECT matches the answer used for graph generation. For “Pokec-Gender” (Fig. 6a), N ET E FFECT report
+heterophily, where people incline to have more opposite gender interactions [7]. For
+“arXiv-Year” and “Patent-Year”, N ET E FFECT find that papers and patents tend to cite
+the ones published in nearby years, which also agrees with intuition (Fig. 6b and 6c).
+Conclusions
+
+We analyze the generalized network-effects (GNE) in node classification in the presence
+of only few labels. Our proposed N ET E FFECT has the following desirable properties:
+1. Principled: N ET E FFECT _T EST to statistically identify the presence of GNE,
+2. General and Explainable: N ET E FFECT _E ST to estimate GNE with derived closedform solution, if there is any, and
+3. Accurate and Scalable: N ET E FFECT _E XP to efficiently exploit GNE for better performance on node classification.
+Applied on a real-world graph with 22.3M edges, N ET E FFECT only requires 14 minutes, and outperforms baselines on both accuracy and speed (≥ 7×).

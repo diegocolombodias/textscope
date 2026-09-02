@@ -1,0 +1,718 @@
+Polynomial Spline Regression: Theory and
+Application
+Mithun Kumar Acharjee
+University of Alabama at Birmingham, AL
+Email: acharjee@uab.edu
+Kumer Das
+University of Louisiana at Lafayette, LA
+Email: kumer.das@louisiana.edu
+January 2, 2023
+
+Abstract
+To deal with non-linear relations between the predictors and the
+response, we can use transformations to make the data look linear or
+approximately linear. In practice, however, transformation methods
+may be ineffective, and it may be more efficient to use flexible regression
+techniques that can automatically handle nonlinear behavior. One such
+method is the Polynomial Spline (PS) regression. Because the number
+of possible spline regression models is many, efficient strategies for
+choosing the best one are required. This study investigates the different
+spline regression models (Polynomial Spline based on Truncated Power,
+B-spline, and P-Spline) in theoretical and practical ways. We focus on
+the fundamental concepts as the spline regression is theoretically rich.
+In particular, we focus on the prediction using cross-validation (CV)
+rather than interpretation, as polynomial splines are challenging to
+interpret. We compare different PS models based on a real data set
+and conclude that the P-spline model is the best.
+
+Keywords: Polynomial Spline Regression, B-spline, P-Spline, Polynomial
+Spline based on Truncated Power, Smoothing Matrix
+Introduction
+
+Analyzing the data with linear regression models is not always sufficient.
+This fact has already been proven in different fields of science,especially
+when dealing with complex relationships such as weather data and physical
+relations [1–5]. This insufficiency is largely due to uncertainty about the
+specific form of an effect that a covariate has on the response or theoretical
+considerations about the application [1]. Variable transformations and the
+use of polynomials are two prevalent methods for dealing with this nonlinearity. In practice, we have very few transformations. Therefore, the
+Polynomial Spline Regression: Theory and Application
+mathematical form of the response and the predictor variable is not only
+limited but also inflexible [6]. Furthermore, polynomial regressions need to
+be more flexible to capture sudden changes in slope, especially at irregular
+intervals. Polynomial regressions tend to fail in high dimensions due to
+perfect multicollinearity (since we are adding covariate squares, covariate
+cubes, etc.). To overcome this situation, statisticians developed a novel
+polynomial spline regression approach.
+Spline regression works in two phases: the first phase ensures the partition
+of the domain of predictor variables into intervals, whereas the second phase
+estimates the polynomials separately in each interval. This two-phase procedure makes the polynomial spline model more flexible in low dimensions
+and less likely to generate perfect multicollinearity in higher dimensions [8].
+Spline models are theoretically vibrant, which led us to investigate different
+types of spline models. The main idea of the truncated polynomial (TP)
+based polynomial splines (PS) is to define local polynomials on intervals in
+the domain of the predictor variable. Also, to ensure smoothness, we need
+the functions to be continuous and differentiable at the interval boundaries.
+Despite some advantages of TP spline (such as easy understanding and simple calculation procedure), researchers are still looking for a better approach.
+Instead, they proposed the B-spline or basic spline, which resolves the numerical instability and co-linearity problems due to relatively closer knots.
+B-splines have beneficial properties, especially the derivatives of the basis
+function. This property has an enormous advantage in spline regression,
+where some significant results are discussed in this paper. Before developing the regularization-based penalty splines, one of the questions that need
+to be answered is: what is the number of knots? To get around this question, the P-spline approximates the function f (z) with a polynomial spline
+that uses many knots (usually about 20–40) [6]. Even in the case of highly
+complex functions, this guarantees that f (z) can be approximated with sufficient flexibility and then use the penalized least square criteria to avoid
+over-fitting.
+While piecewise polynomials have been used to model regression functions
+for a long time [9–13], their application to non-parametric regression, or
+smoothing, is relatively new [14]. A regression spline smoothing involves
+transforming a regression function into a piecewise polynomial with a high
+number of pieces relative to the sample size. Regression spline smoothing
+involves modeling a regression function as a piecewise polynomial with many
+pieces relative to the sample size. A wide range of possible fits is possible
+due to the arbitrary number of polynomial pieces and the location of the
+knots. Because of the high number of candidate models, this flexibility poses
+a challenging model selection problem.
+The study aims to achieve three specific objectives. First, we review different
+PS models (TP-based PS, B-spline, and P-spline) and discuss the theoretical concepts, especially the model formulation, parameter estimation, and
+important properties. Second, we investigate the use of these methods in
+modeling atmospheric pressure data, where we focused on the prediction
+using a more objective approach, namely cross-validation, which aims to
+minimize the mean square prediction error [16]. Lastly, to overcome the
+challenging model selection problem, we compare our models based on the
+six different model selection criteria and suggest the best fitted model.
+The rest of this article is organized into four sections: Section 2 describes
+the mathematical theory and properties of different spline models. Section
+3 describes the data set and the steps to analyze the data. Section 4 provides the results of the analysis, while Section 5 describes and compares the
+findings with concluding remarks.
+
+Polynomial Spline Regression: Theory and Application
+3
+
+Statistical Methods: Polynomial Spline
+
+The idea of the polynomial spline is closely related to polynomial regression. The polynomial regression models the covariate effects on response. A
+classical polynomial model can be written as:
+f (zi ) = γ0 + γ1 zi + · · · + γl zil
+
+(2.1)
+
+If we increase the degrees of the polynomial, the estimated nonlinear function
+f (z) looks very wiggly. To make this polynomial smoother, we can partition
+the covariates domain into different intervals. Secondly, for each interval, we
+can estimate the polynomials. Thus a function f (z) is a polynomial spline
+of degree l ≥ 0 with knots a = k1 < · · · < km = b satisfies the following two
+conditions [6]:
+1. f (z) is continuously differentiable (l − 1) times. In the case of l = 1,
+the function is only continuous (not differentiable). We do not need
+any smoothness requirements for l = 0.
+2. f (z) is a polynomial of degree l on the intervals [kj , kj+1 ) defined by
+the knots.
+In this spline regression, the degree l indicates the overall smoothness, while
+the number of knots controls the number of piece-wise polynomials. There
+are different approaches to the polynomial spline. Some of them are discussed below.
+
+2.1
+
+Polynomial spline (PS) based on truncated power (TP)
+
+Let the standard form of the TP-based polynomial:
+yi = γ1 + γ2 zi + · + γl+1 zil + γl+2 (zi − k2 )l+ + γl+m−1 (zi − km−1 )l+ + i (2.2)
+where,
+(
+(z − kj )l
+(z − kj )l+ =
+if z ≥ kj
+if z < kj
+
+This model has two parts: The first part is a knot-free polynomial having
+l degree, which is also referred to as a global polynomial. The second part
+includes the knots referred to as local polynomials. In a local polynomial, the
+coefficient changes with the change of knots. We use this local polynomial in
+every interval, ensuring global smoothness. In TP-based polynomial spline,
+we first calculate (or draw) all the scale functions separately, and finally,
+we add all of them to get the estimate of f (z). Thus, the final form of the
+TP-based PS is:
+yi =
+
+d
+X
+
+γj Bj (zj ) + i = f (zi ) + i
+
+(2.3)
+
+j=1
+
+where,
+B1 (z) = 1, B2 (z) = z, . . . , Bl+1 (z) = z l , Bl+2 (z) = (z−k2 )l+ , . . . , Bd (z) = (z−km−1 )l+ .
+Here, the TP based polynomial is expressed as a linear combination of the
+d = l + m − 1 functions where m = k + 1.
+
+Polynomial Spline Regression: Theory and Application
+It is essential to know the number and position of the knots in spline regression. There is no “rule of thumb” for determining the number of knots. Howˆ
+ever, we can tell that if the number is high, we can get a more flexible f (z)
+(more wiggly) and vice-versa. On the other hand, the position of the knot
+is determined by different approaches, such as equidistant knots, quantilebased knot. However, these approaches cannot talk about the number of
+knots. This problem is solved by using the regularization of the estimation
+problem using penalty knots which will be discussed in section 2.3.
+The TP basis spline functions are not bounded. As a result, calculating the
+TP basis functions can lead to numerical instabilities for higher values of
+covariates. On the other hand, if the knots are very close to each other, the
+TP-basis function shows high collinearity. One can solve this problem by
+using the basic spline or B-spline.
+
+2.2
+
+B-spline:
+
+B-spline basis function having l degrees consists of (l + 1) polynomial pieces,
+which are added in an (l -1) times continuously differentiable way. The form
+of the basis function is:
+d
+X
+f (z) =
+γj Bj (z).
+(2.4)
+j=1
+
+Here, for l = 0, we can deduce the definition for B-spline as follows:
+Bj0 (z) = I(kj ≤ z < kj+1 ).
+
+(2.5)
+
+Where,
+(
+I(kj ≤ z < kj+1 ) =
+if kj ≤ z < kj+1
+if O.W.
+
+If we deduce the definition for l = 1, we get the following form [15]:
+Bj1 (z) =
+
+z − kj−1
+kj−1 − z
+I(kj−1 ≤ z < kj ) +
+I(kj ≤< kj+1 ).
+kj − kj−1
+kj+1 − kj
+
+(2.6)
+
+where the two linear segments of the basis function is
+[kj−1 , kj ).
+and
+[kj , kj+1 ).
+Similarly, the B-splines of order l (in a general expression) can be defined
+recursively as:
+Bjl (z) =
+
+z − kj−l l−1
+kj+1 − z
+Bj−1 (z) +
+B l−1 (z).
+kj − kj−l
+kj+1 − kj+1−l j
+
+(2.7)
+
+One of the critical properties of the B-spline is the derivative property. Since
+each basis function includes the polynomial term, it is necessary to determine
+its derivatives. These derivatives reveal a simple relationship between the
+derivative of a spline function and the B-splines of degree one less; the
+
+Polynomial Spline Regression: Theory and Application
+calculation details for this can be seen in [15]. The derivative of the general
+expression form is:
+∂ l
+1
+l−1
+Bj (z) = l.(
+Bj−1
+B l−1 (z)).
+(z) −
+∂z
+kj − kj−l
+kj+1 − kj+1−l
+
+(2.8)
+
+Now, to get the derivative of the entire polynomial spline, we sum the equation (2.8), where the final form is as follows [15]:
+d
+
+X γj − γj−1
+∂ X
+γj Bj (zj ) = l.
+B l−1 (z).
+∂z
+kj − kj−1 j−1
+
+(2.9)
+
+j=1
+
+This is the expression for the first-order derivatives using first-order differences of the coefficients and the basic function of the lower order [15]. This
+important result will use in the P-spline in the next section.
+Another important property of the B-spline is the unity decomposition
+meaning the sum of the rows of the design matrix is 1; this can be shown
+from the definition of the splines in [15]. That is,
+d
+X
+
+Bj (z) = 1.
+
+j=1
+
+As a result, the design matrix has no intercept column where the expression
+of the design matrix is:
+
+ l
+B1 (z1 ) . Bdl (z1 )
+.
+.
+.
+Z= .
+l
+l
+B1 (zn ) . Bd (zn )
+
+2.3
+
+Penalized splines (P-Splines)
+
+As seen in the previous subsection, the number of knots significantly impacts the estimation. In this subsection, we discuss how we can control this
+number using the idea of penalization. Briefly, penalization means we first
+use a sizeable generous number of knots, ensuring that our function is well
+estimated. Then, we add a penalty to avoid over-fitting and minimize a
+penalized least square (PLS) criterion.
+2.3.1
+
+P-splines based on TP basis
+
+As seen from the model based on the TP basis equation (2.2), the l + 1
+basis functions in this equation are just the global polynomial, and starting
+from the l + 2 term, we have the truncated polynomials which describe
+deviation from this polynomial. Therefore, adding a penalty on over-fitting
+is equivalent to adding a penalty on the corresponding truncated polynomial
+Pd
+coefficients. This can be expressed as a penalty on this sum
+j=l+2 γj ,
+which means that large coefficients are penalized. Then we estimate the
+coefficients by using least squares with the additional penalization term
+P LS(λ) =
+
+n
+X
+i=1
+
+(yi −
+
+d
+X
+j=1
+(γj B(zi ))) + λ
+
+d
+X
+j=l+2
+
+γj2
+
+(2.10)
+
+Polynomial Spline Regression: Theory and Application
+where λ ≥ 0 is called the smoothing parameter. As λ increases, the estimated coefficients for the truncated polynomial basis will decrease, making
+the plot smoother. As λ goes to infinity, the penalized terms will go to zero,
+and the f (z) estimate approaches an l-degree polynomial. Thus, by varying
+λ, we can control the smoothness of the plot. One big advantage of this
+approach is that after a certain number of knots, our estimation will not be
+affected by increasing the knots if we choose λ optimally. Therefore, this
+explains why this approach is to control the number of knots.
+2.3.2
+
+P-splines based on B-splines basis:
+
+The penalty for truncated polynomials was evident because the basis for
+the global polynomial and the knot part are separate in the model formula.
+On the other hand, the penalty for B-splines is less obvious because the
+basis is formed in a way in which the global polynomial and the truncated
+polynomials are merged in each term [16]. Thus, we must think here from
+another perspective: how to smooth the overall estimated function. To
+characterize the smoothness of any function, using (squared) derivatives is
+appropriate since this represents the variability in the function.
+R 00For example,
+we can add a penalty on the second derivative, such as λ (f (z))2 dz. To
+do that, we can return to the derivative form of the B-spline estimated
+function equation (2.9). We notice from this formula that the first derivative
+is written in terms of the first differences of the corresponding coefficient
+vector; therefore, adding a penalty on the first derivative is equivalent to
+adding a penalty on the first differences of the coefficient vector. In general,
+to add a penalty based on the rth order derivatives, we can use differences
+of a higher-order r. This can be expressed in the penalized residual sum of
+squares
+P LS(λ) =
+
+n
+X
+i=1
+
+where
+
+(yi −
+
+d
+X
+
+(γj B(zi )))2 + λ
+
+j=1
+
+d
+X
+
+(∆r γj )2
+
+(2.11)
+
+j=r+1
+
+∆1 γj = γj − γj−1 & ∆r γj = ∆r−1 γj − ∆r−1 γj−1
+
+Note here that as λ goes to infinity, the fit approaches a polynomial of
+degree r − 1 with rth order differences (of course, assuming l). Therefore,
+this is one other advantage of the B-spline. In contrast to the truncated
+polynomial basis, which will always be of degree l, the B-spline basis adds
+extra flexibility to choose the degree of the splines used for modeling f (z)
+by changing the order of difference used. This provides us with additional
+freedom in the modeling process.
+2.3.3
+
+Penalized least square estimation
+
+To solve the PLS equation, it is very convenient to write it in a matrix
+form because this will provide us with a general form for both TP and Bspline approaches. Also, we will see that this form works for any general
+penalization approach. For the case of TP basis, we can write
+λ
+
+d
+X
+j=l+2
+γj2 = λγ Kγ
+
+Polynomial Spline Regression: Theory and Application
+0
+
+where γ = (γ1 , ..., γd ) & K = diag(0, ..., 0, 1, ..., 1) with (l + 1) zeros and
+(m − 2) ones. For the case of B spline, we can define difference matrices as
+
+
+−1 1
+,
+.
+.
+D1 = 
+−1 1
+such that
+
+D1 γ = (γ2 − γ1 , ..., γd − γd−1 )T
+
+and define the order rth difference matrix as Dr = D1 Dr−1 . Then this yields
+the penalty
+d
+X
+0
+λ
+(∆r γj )2 = λγ Dr Dr γ = λγ Kr γ,
+j=r+1
+
+where Kr is called the rth order difference penalty matrix. Then generally,
+the PLS can be written as
+P LS(λ) = (y − Zγ) (y − Zγ) + λγKγ
+
+(2.12)
+
+Therefore, the estimated coefficient vector which minimizes the PLS is
+γ̂ = (Z 0 Z + λK)−1 Z 0 y.
+
+(2.13)
+
+Notice that although this estimate is biased, it can be shown that if we
+chose λ appropriately, the overall mean square error would be smaller in the
+case of the penalized estimation than in the unpenalized case. So it is a
+better estimator in terms of the bias-variance trade-off. Another interesting
+perspective of this penalization procedure can be shown if we assume the γi
+as martingale random variables and use random walks and Bayes estimation.
+This will lead to the same formula of estimation.
+2.3.4
+
+The smoothing matrix
+
+Here we discuss a concept that will help us compute some important statistical properties like an estimation of error variance and confidence intervals.
+First, apply the Basis formula (TP or B-spline) to all observations and create
+a design matrix Z. We can write y = Zγ +  and therefore
+ŷ = f ˆ
+(z) = Z γ̂ = Z(Z 0 Z + λK)−1 Z 0 y = Sy
+where
+
+S = Z(Z 0 Z + λK)−1 Z 0
+
+(2.14)
+
+is called the smoothing matrix, which we can think of as a generalization
+for the H matrix in linear models. To predict a future point, we can use
+ˆ = z 0 (Z 0 Z + λK)−1 Z 0 y = s(z)0 y,
+f (z)
+where Z is the vector of basis functions evaluated at z. Thus, using this
+ˆ = s(z)0 y, we can calculate the form of confidence intervals, but
+form f (z)
+first, we need to assume that the errors are normally distributed.Then, we
+can calculate the variance of a single observation and the covariance of the
+joint distribution as:
+ˆ = σ 2 s(z)0 s(z)
+V ar(f (z)
+
+Polynomial Spline Regression: Theory and Application
+and
+Cov(fˆr ) = σ 2 Sr Sr0 .
+
+Using the Central limit theorem, we can calculate these confidence Intervals.
+Pointwise confidence intervals with level α is
+p
+ˆ ±z
+f (z)
+1−α/2 σ s(z) s(z)
+and the Simultaneous confidence bands(Bonferroni) is
+q
+ˆj) ± z
+f (z
+1−α/2r σ s(zj ) s(zj )
+and the Simultaneous confidence based on the joint distribution of (f (z1 ), . . . , f (zr ))0
+is
+q
+ˆ j ) ± m1−α σ s(zj )0 s(zj )
+f (z
+where m1−α is determined via simulation, and it defines the 1 − α quantile
+of the distribution of the random variable:
+ˆ j ) − f (zj )
+f (z
+max1<j<r | p
+|
+σ s(zj )0 s(zj )
+In all confidence intervals, we can replace σ 2 with σˆ2 for a large number of
+observations.
+2.3.5
+
+Estimation of σ 2 and method of choosing λ
+
+To find an unbiased estimator for σ 2 , it can be shown algebraically that
+E(
+
+n
+n
+X
+X
+(yi − f ˆ
+(z)))2 = (n − tr(2S − SS 0 ))σ 2 +
+b2i
+i=1
+
+i=1
+
+where bi is the bias of the function estimate at the point zi . If we assume that
+the smoother is approximately unbiased, then we can define the equivalent
+degrees of freedom as edf = tr(2S − SS 0 ), which can be approximated by
+edf = tr(S),
+
+(2.15)
+
+where S is the smoothness matrix, then
+n
+
+σˆ2 =
+
+X
+ˆ 2
+( (yi − f (z)))
+n − edf
+
+(2.16)
+
+i=1
+
+Now we can show how to choose λ; first, we should define our optimality
+criterion, which will be the mean square prediction error(MSE); this is the
+sum of the bias and variance. It follows that minimizing the mean square can
+be done by minimizing the cross-validation criteria. So this means choosing
+the λ, which minimizes
+n
+
+CV =
+
+1X
+ˆ i ))2 ,
+(yi − f −i (z
+n
+i=1
+
+Polynomial Spline Regression: Theory and Application
+where f −iˆ(zi ) denotes the estimation function when removing observation
+i, this can be shown to be equal to
+n
+ˆ i)
+1 X yi − f (z
+)2 ,
+CV =
+(
+n
+1 − sii
+
+(2.17)
+
+i
+
+where sii are the diagonal elements of the smoothing matrix S, we can think
+of this as the leverage from the H matrix in linear modeling. This can be
+justified theoretically by the fact that the expected value of CV is the mean
+square prediction error:
+n
+
+E(CV ) ≈
+
+1X
+ˆ i ))2 ,
+(yn+i − f (z
+n
+i=1
+
+where yn+i is a new observation at point zi . Another method to choose λ is
+to use the AIC criterion where the generalized AIC equation, in this case,
+can be shown to be
+AIC = nlog(σˆ2 ) + 2(edf + 1)
+
+(2.18)
+
+where the edf replaces the number of parameters in the AIC form in the
+unpenalized case. The third way is to estimate λ as a parameter inside the
+model; this can be seen from the Bayesian point of view (discussed in the
+technical part) because from the Bayesian perspective, λ = στ 2 , where τ 2 is
+the prior variance assumed for the random walk. Thus, this can be treated
+as a parameter inside a mixed model and use the estimated procedures of
+mixed models to estimate both σ 2 and τ 2 [17].
+Data and Methods
+
+The data are monthly averaged atmospheric pressure differences between
+Easter Island and Darwin, Australia. The data was collected for 168 months
+from both islands. Here, the response variable is the monthly averaged atmospheric pressure differences between Easter Island and Darwin, Australia.
+The predictor variable is the vector of time values. The data is collected
+from the NIST Standard Reference Database 140 [2]. It has been analyzed
+before using periodic functions, and the reported result for the sum square
+errors was 788 [2].
+First, we checked the linearity of the data using a residual versus fitted
+plot and added the “loess” curve, see Figure 1. Exploratory data analysis suggested that the data was nonlinear. Then we fitted the different PS
+models. Because PS models are complicated to interpret, we focused here
+on the prediction. Thus, we performed a cross-validation method by partitioning our data into two groups: the training set (80% observations) and
+the test set (20% observations). We performed three PS models (TP-based
+PS, B-spline, and P-spline based on B-spline) for different degrees, knots,
+and orders of derivatives for smoothing. We applied all these models to
+the training data. We recorded all the comparison criteria, such as AIC,
+BIC, R2 , PRESS residuals, and cross-validated mean squared prediction error (CVMSPE). For the P-spline, a more stable and numerically preferable
+Generalized cross-validation criteria was used as suggested in the R function “gam” in the mgcv library [6]. Later, we apply the models in the test
+data to understand how well the models predict based on the Mean Square
+
+Polynomial Spline Regression: Theory and Application
+prediction Error (MSE) values. We choose the best model from each set of
+polynomial spline models (one from TP-based PS, one from B-spline, and
+one from P-Spline). We compare these three models based on the abovementioned criteria and select the best PS model. It is also important to note
+that all the analyses are carried out using an equidistant knot approach. We
+perform the data analysis using R [18].
+Results
+
+4.1
+
+Detecting non-linearity
+
+Figure 4.1: Detecting non-linearity: Atm. Pressure vs. Time plot (left
+panel) and estimated residual vs. fitted values (right panel)
+From Figure 4.1 we can tell that the data are very scattered, which shows
+the non-linearity pattern between the atm. pressure and time variable. The
+right graph indicates that the loess curve (red line) is more precise at the
+beginning, but after Ŷ = 500, the predicted atmospheric pressure, the loess
+curve is less precise. Also, the Loess curve does not coincide with the horizontal error line, indicating that a non-linearity pattern exists.
+
+4.2
+
+Model comparison
+
+We experimented with three models using a different number of knots, different degrees of polynomials, and different orders of differentiation (this
+is applicable only for P-spline). We compare the models based on different criteria. The detailed results are given in Tables 6.1, 6.2 and 6.3 (see
+Appendix).
+
+Polynomial Spline Regression: Theory and Application
+Based on six different model selection criteria, we choose our best model
+from the three different PS models shown in Tables 6.1, 6.2 and 6.3. The
+following table shows the best model from the three methods used.
+Table 4.1: Comparing models based on the different model selection criteria
+PS Models
+PSM based on TP
+B-spline
+P-spline
+
+knots
+2
+degrees
+41
+Diff.Order
+—
+—
+AIC
+248
+BIC
+378
+R2
+0.98
+0.97
+0.76
+
+PRESS resid.
+776
+CVMSPE(Train.)
+6.97
+6.9
+4.9
+
+Table 4.1 indicates that the AIC, Press Residuals, CVMSPE, and MSE are
+the lowest for P-spline regression. Though the R2 is not high compared to
+the other model, we consider here P-spline as the best model. One possible
+explanation is that our focus is on the prediction, and we rely more on the
+values of CVMSPE and MSE.
+
+Figure 4.2: Plot of the best fitted model (P-spline) based on the training
+data (red points) and test data (blue points)
+Figure 4.2 shows the fit of the best-fitted model (P-spline model) based on
+the training data set (red points) and test data set (blue points). It shows
+that the overall fit follows the pattern in the data and covers most of the
+points.
+
+MSE (Test)
+40
+8.6
+
+Polynomial Spline Regression: Theory and Application
+Figure 4.3: Residual vs Fitted graph for the best-fitted model (P-spline
+model)
+Figure 4.3 shows the residual vs. fitted plot for the best model. Here
+the errors have no usual pattern meaning that errors are homoscedastic
+and are approximately independent. From here, we can assume that errors
+are approximately normally distributed, which will help us to construct a
+confidence interval based on the normality assumptions.
+Conclusion
+
+Overall, the second-degree polynomial gives better results in these three
+methods. In addition, since the data are very scattered, the fit improves
+as the number of knots increases. However, when we used P-splines, the fit
+tended to saturate after the number of knots exceeded 80, which is in line
+with the theory that the fit is not affected by the number of knots after
+some point. Also, it is essential to note that this data has a periodic trend,
+so if we try to predict a future value, we should consider this by repeating
+this fit periodically rather than just extending the polynomial after the last
+knot. This suggests that, for future improvements, periodic functions can
+be used with PS methods.

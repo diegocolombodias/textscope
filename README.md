@@ -53,6 +53,57 @@ would launder a stylistic measurement into a claim about a person.
     python cli.py analyze draft.txt --reference reference.json
     python app.py --model ./models/gpt2-large      # http://127.0.0.1:7860
 
+## Reading the highlight colors (web UI)
+
+With a model loaded (`app.py --model ...`), each sentence in the
+annotated-text panel gets a background color and a small `ppl=N.NN` badge.
+Both come from the same number, so here is what it means and how to read
+the color.
+
+**What `ppl` is.** Perplexity — `exp(average per-token negative
+log-likelihood)` for that sentence, under the local model. Loosely: "how
+surprised the model was, on average, predicting each word given what came
+before."
+
+* **Low ppl** (a few units, e.g. `ppl=8.2`) — the sentence was highly
+  predictable to the model. Generic, low-information phrasing scores low
+  here, which is also the shape of most LLM-generated prose — that overlap
+  is the entire reason this feature family exists.
+* **High ppl** (dozens to hundreds, e.g. `ppl=101.95`) — the sentence
+  surprised the model. Technical jargon, an unusual name, a formula badly
+  extracted from a PDF, or a switch in register can all push this up.
+
+**The color is diverging, not a single intensity, on purpose.**
+Predictability has a genuine middle — "unremarkable, about as surprising as
+the rest of the text" — with two distinct extremes on either side of it, so
+a two-hue scale with a neutral midpoint is the correct encoding (a single
+hue getting darker only makes sense for a plain 0-to-many magnitude, which
+this isn't).
+
+| Color | Meaning | Nats (NLL) |
+|---|---|---|
+| 🔴 red, saturated | very predictable — the flat, low-surprisal signal this tool measures | ~0 |
+| pale red → gray | leaning predictable, mild | 0–3 |
+| gray, faint | unremarkable — nothing to see here | ~3 |
+| gray → pale blue | leaning surprising, mild | 3–6 |
+| 🔵 blue, saturated | very surprising to the model | ~6+ |
+
+Color *intensity* also carries information: it fades toward transparent
+near the gray midpoint and strengthens toward either pole, so the page
+draws your eye to the sentences actually worth a second look instead of
+tinting everything uniformly.
+
+**Without a loaded model** (stylometry-only mode), the highlight falls back
+to a single orange hue whose *intensity* (not hue) tracks how many
+stylometric flags landed on that sentence — a plain count, not a spectrum,
+so there's no second color to diverge toward.
+
+**Same caveat as everywhere else in this tool:** the color tells you where
+to look, not what you'll find when you get there. Red is not "AI." Blue is
+not "definitely human." A dense related-work paragraph can turn blue for
+the same reason a second-language author can turn red — see *What it does
+not do*, above.
+
 ## Using it fairly
 
 If you use this on student work, the output is a reason to open a

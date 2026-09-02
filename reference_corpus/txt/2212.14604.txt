@@ -1,0 +1,1893 @@
+Testing RESTful APIs: A Survey
+Amid Golmohammadi, Man Zhang, Andrea Arcuri
+Kristiania University College and Oslo Metropolitan University, Norway
+
+Abstract
+In industry, RESTful APIs are widely used to build modern Cloud Applications. Testing them
+is challenging, because not only they rely on network communications, but also they deal with
+external services like databases. Therefore, there has been a large amount of research sprout in
+recent years on how to automatically verify this kind of web services. In this paper, we review
+the current state-of-the-art on testing RESTful APIs, based on an analysis of 92 scientific articles.
+This review categories and summarizes the existing scientific work on this topic, and discusses the
+current challenges in the verification of RESTful APIs.
+
+Keywords: survey, literature review, REST, API, testing, test case generation, fuzzing, web
+service
+Introduction
+
+When building the backends for web and enterprise applications, using RESTful APIs [91] is a common
+choice, especially in microservice architectures [132]. Many companies use this kind of systems for
+their backends, like for example Netflix, Uber, Airbnb, eBay, Amazon, Twitter, Nike, etc [138].
+Not only RESTful APIs are used to build the backends of enterprise applications, but also there are
+many of this kind of APIs directly available on internet, providing all different kinds of functionalities.
+For example, ProgrammableWeb 1 currently lists more than 24 thousand Web APIs, where RESTful
+ones are the most common (other kinds are for example the old SOAP [83] and the more recent
+GraphQL [17]). Several companies provide APIs to their services on internet using REST, such as for
+example Google2 , Amazon3 , Twitter4 , Reddit5 , and LinkedIn6 .
+However, verifying the correctness of Web APIs is quite challenging [74, 72]. Not only a tester
+needs to create network messages (e.g., using HTTP over TCP) toward the API, but typically there is
+also the need to setup the right data into the databases and possibly mock interactions with other
+external services [48]. Due to their wide use in industry, it is hence not surprising that there has been
+a lot of attention from the research community on the developing of novel techniques to test this kind
+of applications in recent years. Therefore, to help carrying out further research endeavors on this topic,
+in this paper we survey and categorize the current state-of-the-art of the scientific literature on testing
+RESTful APIs. In particular, in this paper we aim at answering the following 12 research questions
+from four perspectives based on a selection of 92 scientific articles:
+• Publication status in testing RESTful APIs
+– RQ1: How many papers were published per year?
+– RQ2: In which venues were the papers published?
+– RQ3: What contributions to testing RESTful APIs have been made by the papers in this
+area, and what are their frequencies?
+https://www.programmableweb.com/api-research
+https://developers.google.com/drive/v2/reference/
+http://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html
+https://dev.twitter.com/rest/public
+https://www.reddit.com/dev/api/
+https://docs.microsoft.com/en-us/linkedin/
+1
+
+• Existing approaches in supporting automated testing of RESTful APIs
+– RQ4: What metrics are used to evaluate the effectiveness of the testing?
+– RQ5: What techniques are used for automatically testing RESTful APIs?
+– RQ6: What kind of testing has been automated for RESTful APIs?
+– RQ7: What kind of artifacts are used for conducting empirical evaluations?
+• Available Tools for Testing RESTful APIs
+– RQ8: Which research tools are open-source?
+– RQ9: Which non-research tools are used/compared?
+– RQ10: Which features are supported by the research prototypes?
+• Addressed and Open Challenges
+– RQ11: Which research challenges are addressed?
+– RQ12: Which open research challenges are identified?
+The paper is organized as follows. Section 2 discusses important background information, needed
+to better understand the rest of the paper. Related work is discussed then in Section 3. How the
+92 articles were selected is described in Section 4. Our research questions are answered in Section 5
+(publication status, RQ1-3), Section 6 (approaches, RQ4-7), Section 7 (tools, RQ8-10), and Section 8
+(challenges, RQ11-12). Threats to validity are discussed in Section 9. Finally, Section 10 concludes the
+paper.
+Background
+
+2.1
+
+Hypertext Transfer Protocol and REST
+
+HTTP (Hypertext Transfer Protocol) is an application-layer protocol for hypermedia information
+systems that are distributed and collaborative over a computer network. Through the extension of its
+request methods, error codes, and headers, this generic and stateless protocol can be used for many
+tasks other than hypertext, such as name servers and distributed object management systems [90].
+REST (Representational State Transfer) is an architectural style which was introduced by Fielding
+in 2000 [91] that is followed by many modern web APIs. REST is not a protocol, as it just defines a
+set of guidelines for designing APIs for accessing and manipulating resources using HTTP over the
+network.
+To reduce interaction latency, enforce security, and encapsulate legacy systems, REST stresses
+scalability of component interactions, generality of interfaces, autonomous deployment of components,
+and intermediary components. REST does not enforce any rules on how it should be implemented at
+the lower level. Instead, it defines a set of high-level design constraints including separation of concerns
+related to client and server, statelessness, the ability to cache data, having a uniform interface between
+components, multilayeredness and code-on-demand (this latter is optional). It encourages users to
+come up with their own solutions as it is neither a protocol, nor a standard. This means that it can be
+implemented in a variety of ways and there is no enforcement to adopt any specific design pattern. For
+instance, REST does not force the application to embrace SOLID [133] principles such as Dependency
+Inversion. Despite it is better to adhere to those kinds of design principles to have more sustainable
+applications, none of the REST constraints get violated in case a high level module (e.g., the code
+which defines API endpoints) is tightly coupled to a low level module (e.g., a module to connect to
+an SQL database). A REST API can be implemented with different programming languages (e.g.,
+Python7 , C#8 ) and frameworks (e.g., Express9 and Ruby on Rails10 ).
+https://www.python.org/
+https://docs.microsoft.com/en-us/dotnet/csharp/
+https://expressjs.com/
+https://rubyonrails.org/
+2
+
+In a RESTful API, any piece of information that we can think of can be referred to as a resource.
+A document or image, for example, can be a REST resource, as can a temporal service, a collection of
+other resources, or a non-virtual object (e.g., an employee) [28]. A RESTful API sends a representation
+of the resource’s state to the caller when a client request is made. JSON (Javascript Object Notation),
+HTML, and plain text are among common data formats that can be sent via HTTP. Among them,
+JSON is the most widely used file format [131] because, contrary to its name, it is language-independent
+and understandable by both humans and machines.
+In order to specify the desired action to be taken for a certain resource, HTTP specifies a number
+of request methods. These request methods are commonly referred to as HTTP verbs. Multiple actions
+can be done on a resource by taking advantage of HTTP verbs such as GET and POST. For example,
+a list of employees can be retrieved by invoking the URL for employees (e.g., ‘‘/employees” which
+is appended to the base URL of the API) with GET. As another example, a single employee can be
+fetched by calling its URL (e.g., ‘‘/employees/42’’, where 42 is the identifier of the intended employee).
+Similarly, a new employee can be added by invoking the same URL for retrieving the list of employees
+with POST verb and including the data of the new employee in the body payload of the HTTP request.
+There are three other HTTP verbs that are used frequently within RESTful APIs, including PUT,
+PATCH and DELETE. These verbs are utilized for updating by replacing, updating by modification and
+deleting a resource, respectively.
+
+2.2
+
+OpenAPI
+
+The OpenAPI Specification (OAS)11 defines a common, language-independent interface to RESTful
+APIs [25]. It enables both humans and machines to learn about and comprehend the capabilities
+of the service without having access to the service’s source code or network traffic analysis. A user
+can comprehend and use a remote service with minimal implementation logic when it is properly
+defined. An OpenAPI specification can then be utilized by automated tools for creating user-friendly
+documentation (e.g., an interactive web page) to display the API, tools for creating code to generate
+server stubs and client libraries in different programming languages, tools for testing, and many more
+use cases [24].
+The OAS defines an OpenAPI document as an object that may be expressed in either JSON or
+YAML. Primitive data types in the OAS are based on the types supported by JSON specification [21].
+Figure 1 displays a sample OpenAPI document in JSON format. It gives information to the client on
+how to invoke endpoints in this API, such as which URIs and which HTTP verbs must be used to
+invoke that specific endpoint, and also what parameters might be needed and their data types. In this
+example (Figure 1), there are only two simple GET endpoints: the first one’s URL is ‘‘/employee’’,
+which does not take any input parameters. The second one has the same URL, in addition to an input
+parameter of type integer.
+OpenAPI is one of the widely used techniques to define the schema of a REST API. There are other
+languages which can be used to describe APIs, such as RAML12 and APIBluePrint13 . However, they
+are not as commonly used as OpenAPI, especially for the purpose of fuzzing. Fuzzing is the process of
+creating and running tests automatically with the intention of identifying flaws [147]. Finding inputs
+that cause inappropriate program execution as a result of improper input data processing is the major
+goal of fuzzing [164]. Many fuzzing tools [59, 50, 108, 100] rely on OpenAPI specification as it outlines
+how to use a REST API, including the types of requests it can handle, the possible responses, and the
+format of the possible responses.
+Related Work
+
+In software engineering research, there are several surveys that summarize, categorize and analyze
+the current state-of-the-art on different research topics. Examples include search-based test case
+https://swagger.io/specification/
+https://raml.org/
+https://apiblueprint.org/
+3
+2
+4
+6
+8
+10
+12
+14
+16
+18
+20
+22
+24
+26
+28
+30
+32
+34
+36
+38
+40
+42
+44
+46
+
+{
+" openapi " : " 3.0.1 " ,
+" info " : {
+" title " : " Employees API " ,
+" version " : " v1 "
+},
+" paths " : {
+" / employee /{ id } " : {
+" get " : {
+" tags " : [
+" Employee "
+],
+" parameters " : [
+{
+" name " : " id " ,
+" in " : " path " ,
+" required " : true ,
+" schema " : {
+" type " : " integer " ,
+" format " : " int32 "
+}
+}
+],
+" responses " : {
+" 200 " : {..} ,
+" 400 " : {..} ,
+" 401 " : {..}
+}
+}
+},
+" / employee " : {
+" get " : {
+" tags " : [
+" Employee "
+],
+" responses " : {
+" 200 " : {..} ,
+" 400 " : {..} ,
+" 401 " : {..}
+}
+}
+}
+},
+" components " : {..}
+}
+
+Figure 1: An example of OpenAPI 3.0 schema
+generation [46], search based mutation testing [142], software-testing education [94], test case selection
+and prioritization using machine learning [135], software testing effort estimation [70], software
+robustness assessment [109], oracle problem in software testing [66], flaky tests [136] and software
+engineering for AI-based systems [127].
+Regarding the testing of web services, some old surveys (from 2009 and 2013) analyzed the challenges
+of testing service-oriented architectures [74, 72]. However, as they are old, they do not represent
+the current state-of-the-art, especially considering the blossoming of research activities from 2017 on
+(which will be discussed in more details in Section 5.1).
+There is currently another short survey on the testing of RESTful APIs [87], published in the
+Applied Sciences journal in 2022. Such survey is based on 16 published articles, addressing the following
+research questions:
+• RQ-1: What are the main challenges in generating unit tests for RESTful APIs?
+• RQ-2: What are the code coverage concerns when it comes to testing RESTful APIs?
+• RQ-3: What solutions are currently available to meet testing and unit test generation challenges?
+• RQ-4: What support do solutions provide for authentication-enabled RESTful APIs’ testing and
+unit test generation?
+Our survey is much larger, covering 92 articles instead of just 16 (and all these 16 are included in
+our analyses). Furthermore, compared to those 4 RQs listed in [87], we answer many more research
+questions from various perspectives (e.g., testing metrics, testing kinds, existing fuzzers and challenges),
+in order to provide a better overview of the current state-of-the-art in this domain.
+Research Method
+
+4.1
+
+Research Questions
+
+To investigate current research in addressing REST API testing, we conduct a systematic literature
+review (SLR) to answer the following research questions from four perspectives:
+• Publication status in testing RESTful APIs
+– RQ1: How many papers were published per year?
+– RQ2: In which venues were the papers published?
+– RQ3: What contributions to testing RESTful APIs have been made by the papers in this
+area, and what are their frequencies?
+• Existing approaches in supporting automated testing of RESTful APIs
+– RQ4: What metrics are used to evaluate the effectiveness of the testing?
+– RQ5: What techniques are used for automatically testing RESTful APIs?
+– RQ6: What kind of testing has been automated for RESTful APIs?
+– RQ7: What kind of artifacts are used for conducting empirical evaluations?
+• Available Tools for Testing RESTful APIs
+– RQ8: Which research tools are open-source?
+– RQ9: Which non-research tools are used/compared?
+– RQ10: Which features are supported by the research prototypes?
+• Addressed and Open Challenges
+– RQ11: Which research challenges are addressed?
+– RQ12: Which open research challenges are identified?
+
+4.2
+
+Database and Search Queries
+
+To find relevant papers, we took advantage of seven databases as listed in Table 1. These online
+repositories of peer-reviewed articles were selected based on their popularity and extent of relevance to
+software engineering research. These sources contain well-known conferences and journals in the field.
+Existing surveys in software engineering research (e.g., [135, 70] widely referenced them, as they offer
+a variety of authoritative publication venues in the field.
+In order to achieve the objectives of this work and answer our research questions, we put together
+our search terms according to the specific format of each database. The queries were formulated around
+the concept of applying testing on RESTful APIs. In some databases, such as IEEE and ACM, to
+have more relevant results, we excluded the papers which do not contain at least one of the commonly
+used terms in the literature in any part of them (e.g., by using Anywhere in ACM) including black box,
+white box, fuzzing, fuzzer, unit test, system test, end to end test and integration test. The numbers of
+papers found as the result of search queries are shown in Table 1. The search was conducted on March
+1, 2022.
+Table 1: Selected databases, with search queries and number of found articles
+
+Name
+
+Search Query
+
+Found Papers
+
+IEEE
+
+(”Document Title”:restful OR ”Index Terms”:restful OR ”Document Title”:rest OR ”Index Terms”:rest) AND (”Document Title”:test* OR ”Index
+Terms”:test*) AND (”Full Text .AND. Metadata”:”white box” OR ”Full
+Text .AND. Metadata”:”black box” OR ”Full Text .AND. Metadata”:fuzz*
+OR ”Full Text .AND. Metadata”:”unit test*” OR ”Full Text .AND. Metadata”:”integration testing” OR ”Full Text .AND. Metadata”:”system test*”
+OR ”Full Text .AND. Metadata”:”end to end test*”)
+ACM
+
+(Title:(restful) OR Keywords:(restful) OR Title:(rest) OR Keywords:(rest))
+AND (Title:(test*) OR Keyword:(test*)) AND (Anywhere:(white box) OR Anywhere:(black box) OR Anywhere:(fuzz*) OR Anywhere:(”unit test”) OR Anywhere:(”unit tests”) OR Anywhere:(”unit testing”) OR Anywhere:(”integration
+test”) OR Anywhere:(”integration tests”) OR Anywhere:(”integration testing”) OR Anywhere:(”system test”) OR Anywhere:(”system tests”) OR Anywhere:(”system testing”) OR Anywhere:(”end to end test”) OR Anywhere:(”end
+to end tests”) OR Anywhere:(”end to end testing”))
+ScienceDirect
+
+Title, abstract, keywords: (restful OR ”rest api” OR ”rest apis” OR ”rest
+service” OR ”rest services” OR ”rest web services”) AND (test OR testing OR
+tests)
+Subjects: Computer Science
+Wiley
+
+(test*) AND (restful OR ”REST API” OR ”REST APIs” OR ”REST service”
+OR ”REST services” OR ”REST web service” OR ”REST web services”)
+Subjects: Computer Science
+Web of Science
+
+(TI=(restful) OR AK=(restful) OR TI=(”rest api”*) OR AK=(”rest api”*) OR
+TI=(”rest service”*) OR AK=(”rest service”*) OR TI=(”rest web service”*)
+OR AK=(”rest web service”*)) AND (TI=(test*) OR AK=(test*))
+MIT Libraries
+
+Abstract contains: (restful OR ”rest api*” OR ”rest service*” OR ”rest web
+service*”) AND (test*) AND Any field contains: ”black box” OR ”white box”
+OR ”unit test*” OR ”integration test*” OR ”system test*” OR ”end to end
+test*” OR fuzz*
+Springer
+
+restful AND test AND api
+Articles within Computer Science and Software Engineering/Programming and
+Operating Systems
+Each repository had its own limitations to conduct advanced searches. For example, unlike IEEE
+and ACM, it did not seem to be possible to formulate an advanced search query in Springer. At the
+time of writing this survey, there was no feature to limit the results based on different sections of the
+paper (e.g., Title or Abstract) in Springer. Therefore, the only option we had was to do a broad search
+query and limiting it by subject (i.e., Computer Science and then Software Engineering/Programming
+and Operating Systems) and type of the study (i.e., Article). In ScienceDirect, there was a limitation
+for boolean operators. It did not allow more than 8 boolean operators, so we were not able to include
+terms such as SBST. Another impediment with this repository was that it did not support wildcards.
+
+4.3
+
+Paper Selection Criteria
+
+Table 2 introduces the inclusion criteria we used to select papers. In general, we chose papers that
+are written in English, and that are related to testing in the domain of REST APIs. However, to be
+included, an article did not have to be exclusively in the domain of REST. It could be generally about
+web services, cloud services, etc., which might encompass RESTful APIs as well. We excluded theses
+(e.g., MSc and PhD). We also excluded existing surveys, as those are rather discussed in our Related
+Work (Section 3).
+Table 2: Inclusion and Exclusion Criteria
+
+Criterion
+2
+4
+4.4
+
+The paper is in English
+The paper is related to testing
+The paper is about REST. It does not have to be exclusively about REST.
+The paper is not a thesis.
+The paper is not a survey or a systematic literature review.
+
+Snowballing
+
+The idea of conducting this phase was to employ a hybrid search strategy to reduce the chance of
+missing important relevant papers. To do so, we conducted forward and backward snowballing on
+June 14th, 2022. Forward and backward snowballing refer to checking the reference list and citations
+of a paper, respectively. To find citations of a paper, we took advantage of Google Scholar 14 . By
+studying and evaluating them based on the defined inclusion criteria, we finally gathered 92 papers
+in total, including 40 ones which were initially found by search and also 52 new ones by conducting
+snowballing.
+There are several reasons why the number of papers found in this step are considerably larger than
+that of found during the initial search. First, some of the papers were published after March 1st, 2022,
+which is the date we conducted the initial search. This group includes 16 papers. Second, 15 papers
+were only available in sources that were not among those which had been selected to conduct the
+initial search (see Table 1). These sources include arXiv, Penn State, KSIResearch, Open Journals,
+unam.mx, Semantic Scholar, sistedes.es and Macrothink Institute. The third reason could be that the
+approach might not be specific to REST, and the term REST might be not present in either the title,
+abstract or keywords. However, during the snowballing phase, if we found papers where the proposed
+approach was evaluated on REST APIs, then we include them in this survey. In addition, there might
+exist some bugs in the search services provided by the article databases. For instance, by taking a
+look at the paper [165], we found out that this should had appeared in results of the initial search as
+it fits our search query, but surprisingly did not. Then, we reported such issues to the service (i.e.,
+ACM), and those have been confirmed and fixed by now.
+
+4.5
+
+Data Extraction
+
+Table 3 contains the types of extracted data for each research question. We designed a spreadsheet
+in Google Sheets to put together collected data from the selected papers. This included name of the
+paper, a unique given ID and information related to answering research questions. Before conducting
+the data extraction, we prepared a list of possible categories and relevant keywords to search for (e.g.,
+black-box and white-box ), and refined such selection while investigating each paper. However, by
+starting to study the papers, we found some other possible values. For example, regarding RQ5, we
+found out that not all the papers use either black-box or white-box techniques, and also they can be
+both supported at the same time (e.g.,[51]).
+To conduct the data extraction, the papers were divided between two of the authors. Each of them
+extracted the data based on the types shown in Table 3. Then, the results were double-checked by the
+other author. In case of any discrepancy, the issue was discussed and settled by the third author.
+Status of Publications in REST API Testing
+
+To study the trends of research in REST API testing, in this section we report our investigation on
+existing studies of REST API testing with academic publications. These findings are categorized in
+terms of time (RQ1), venues (RQ2), and main contributions (RQ3).
+http://scholar.google.com/
+Table 3: Type of Data Extracted Per Research Question
+RQs
+
+Type of Extracted Data
+
+RQ1
+RQ2
+RQ3
+
+The number of papers per year
+The number of papers per venue
+1) Types of contribution of the papers, and
+2) The number of papers per contribution type
+Existing metrics which have been applied for guiding/evaluating REST API testing
+Existing testing techniques for REST APIs
+Types of testing which REST API testing approaches support
+1) Types of artifacts which have been used for conducting evaluation of REST API testing, and
+2) Locations and availability of the artifacts
+1) REST API testing approaches which have the open-source prototype, and
+2) Replicability of experiments conducted with the prototypes
+Existing non-research tools which have been applied for REST API testing
+Features which have been supported by research prototypes of REST API testing
+Research questions and hypotheses which have been studied in REST APIs testing
+Open challenges which have been identified in testing REST APIs
+
+RQ4
+RQ5
+RQ6
+RQ7
+RQ8
+RQ9
+RQ10
+RQ11
+RQ12
+
+5.1
+
+RQ1: How many papers were published per year?
+
+Figure 2 illustrates the amount of papers published from 2009 to 2022. It shows that there has been
+an upward trend in the number of papers in the domain of RESTful APIs testing during recent years.
+There was not a considerable number of studies before 2017, as the number has fluctuated between
+0 and 2. However, the quantity of published papers has increased dramatically from 2017 onward. In
+2018, 8 papers were published and this number further increased and reached to the highest, 24, in
+2021. At the time of finalizing the selected papers for this survey (June 2022), only half of the year
+2022 has passed. This is the reason why the number of papers published in 2022 is lower than that of
+2021.
+24
+15
+10
+
+Number of papers
+5
+4
+1
+2
+0
+1
+
+2010
+
+2012
+2014
+
+2016
+
+2018
+
+2020
+
+2022
+
+Year
+
+Figure 2: Number of selected papers (y-axis) per year (x-axis)
+RQ1: Since 2017, there has been a dramatic increase in the number of scientific studies on testing
+REST APIs.
+5.2
+
+RQ2: In which venues were the papers published?
+
+Papers selected for this survey have been published in a variety of venues. Table 4 gives information
+about the number of papers being published in each venue and its type. A venue can be of type
+conference, journal or other open-access repositories. The table is sorted in descending order, based
+on the number of papers. To keep the table short, we represent a full name of a venue only if: (1)
+more than one paper is published in the venue or (2) a journal article is published by one of the main
+publishers in the field of software engineering (i.e., ACM, Elsevier, IEEE, Springer, Wiley). For others,
+we categorized them into Other Conferences and Other Journals based on the venue type.
+Based on Table 4, 92 studies of REST API testing have been published in 63 various venues (i.e., 48
+conference venues, 14 journals venues and 1 open access repository) which have covered well-known
+top SE venues, such as TOSEM, TSE, EMSE and ICSE. Regarding conference publications, there are
+in total 66 papers. On top, with 43 papers, there is Other Conferences, which aggregates the amount
+of papers from conferences with a single publication. The most common venues are ICSE (ACM/IEEE
+International Conference of Software Engineering) and ICST (IEEE International Conference on
+Software Testing, Verification and Validation), with 7 and 6 papers. In addition, 20 articles have been
+published in journals, and the most frequent journal is TOSEM. It is a peer-reviewed journal published
+by ACM, which stands for ACM Transactions on Software Engineering and Methodology. Besides,
+there also exist 6 papers which have been submitted to a non-peer reviewed open access repository, i.e.,
+arXiv.
+Table 4: Number of papers per venue and their type
+
+Venue
+2
+4
+6
+8
+10
+12
+14
+Number of Papers
+
+Other Conferences
+Other Journals
+ICSE
+arXiv
+ICST
+TOSEM
+QRS
+IEEE TSE
+ESEC/FSE
+GECCO
+ISSTA
+Applied Soft Computing
+EMSE
+IEEE Software
+IEEE TSC
+8
+6
+5
+3
+2
+1
+1
+Venue Type
+Conference
+Journal
+Conference
+Open-access Repository
+Conference
+Journal
+Conference
+Journal
+Conference
+Conference
+Conference
+Journal
+Journal
+Journal
+Journal
+
+RQ2: From 2009 to 2022, scientific work on testing RESTful APIs was published in 63 different
+venues, where ICSE/ICST and TOSEM were the most frequent conferences and journal, respectively.
+
+5.3
+
+RQ3: What contributions to testing RESTful APIs have been made by the
+papers in this area, and what are their frequencies?
+
+To better study what contributions have been made in existing studies, we defined 5 different categories
+to classify main contributions of selected papers, as follows.
+• New automated approach and its extension
+This category includes papers which propose a new tool, algorithm, framework or method for
+automated testing of REST APIs and its integrated extensions for enhancing the automated
+approach. For example, regarding automated test case generation for REST APIs, Arcuri
+proposed the Many Independent Objective (MIO) algorithm specific to white-box system level
+test generation [49], and enabled search-based software testing (SBST) of REST APIs with
+MIO [50], implemented as an open-source fuzzer, named EvoMaster. To further improve the
+SBST of REST APIs, SQL handling [53] and testability transformation [55] were integrated
+into EvoMaster. However, such extension techniques can be used outside of REST APIs, i.e.,
+applied for testing of other domains. Another example for test data generation is ARTE, which
+is an approach presented in [150] to automatically extract realistic data inputs for REST APIs
+from knowledge bases (e.g., DBpedia) by taking advantage of a number of techniques, including
+natural language processing, search-based, and knowledge extraction. To make ARTE fully
+automated, it is integrated into RESTest [126].
+• New analysis approach and potential solution
+Studies which, instead of proposing a new approach for directly achieving automated testing,
+help to analyze testing related aspects (such as coverage metrics) and identify potential solutions
+for testing of REST APIs, fall into this category. For instance, Marculescu et al. [118] studied
+faults in RESTful APIs selected from EMB repository [9], and proposed a taxonomy of the faults
+identified in the REST API with EvoMaster [118]. Martin-Lopez et al. [124] defined a set of
+coverage metrics based on API schema in the context of black-box testing of REST APIs. Katt
+and Prasher [69] identified potential security threats in REST APIs and proposed corresponding
+quantitative security assurance metrics. In addition, Soni et al. [143] proposed a framework for
+allowing mocking external dependencies of Java REST APIs. However, this mocking solution is
+for unit testing, and it could be potentially adopted to automated testing approaches for enabling
+additional handling of external services.
+• Empirical study on various automated approaches
+This group of papers focus on comparing existing approaches by conducting empirical evaluations.
+For instance, the study conducted by Corradiani et al. in [80] automated black box approaches
+for testing REST APIs have been compared by conducting an empirical comparison on them.
+There also exist studies for comparing existing fuzzers for REST APIs [106] and analyzing open
+problems [167] with the fuzzers.
+• Tool implementation or demostration
+Papers which mainly focus on implementation of a testing tool, or show how a tool can be used,
+fall into this category. For instance, Restats is introduced in [81], which is a tool to compute
+coverage metrics for black-box testing of REST APIs. This tool adopts the coverage metrics
+proposed by Martin-Lopez et al. [124].
+• Proposal or idea
+These papers do not include any conducted study. Instead, they suggest a new idea or plan
+to carry out research on the testing of REST APIs. For instance, Martin-Lopez in [119] was
+planning to develop a framework for specification-driven testing that will automatically create
+complex test cases for Web APIs and also intelligent programs (called “bots”) which can generate
+a large number of inputs.
+The data provided in the form of pie-chart in Figure 3 shows the share of selected papers based on
+their main contribution. ‘‘New automated approach and its extension’’ has the highest percentage with
+66%. ‘‘New analysis approach and potential solution’’ is the second largest category and comprises
+of almost one-fifth of the papers by 18%. The three other categories are much smaller (e.g., 3% for
+‘‘Empirical study on various automated approaches’’).
+More details on the different categories and type contributions are presented and analyzed in the
+following research questions.
+RQ3: 5 different contributions were found from the main contributions of the selected 92 papers.
+66% of the papers propose a new automated approach and its extension for testing RESTful APIs,
+while 18% of the papers are new analysis approach and potential solution of REST API testing.
+66%
+
+3%
+8%
+4%
+18%
+EA: Empirical study on various automated approaches
+NA: New automated approach and its extension
+NP: New analysis approach and potential solution
+PI: Proposal or idea
+TD: Tool implementation or demostration
+
+Figure 3: Types of paper contributions and their frequencies
+Approaches to Testing REST API
+
+One of the main objectives of this survey is to identify existing testing approaches which have been
+developed to be automated in the context of REST APIs.
+Figure 4 represents a high-level abstraction of testing of REST APIs. A RESTful API typically
+exposes a schema about how to access the web service. The schema could be represented in various
+ways (e.g., JSON, XML, formal model), and one popular technique to define the schema is OpenAPI,
+as discussed in Section 2.2. As the schema defines the structure of the resources handled by SUT
+and the available actions to access these resources [25, 170], it is often used as an input to test the
+REST API, e.g., define metrics as test criteria, automatically generated tests (referred as the term
+fuzzing [96]). The test generation is typically guided by heuristics aimed at optimizing those metrics.
+Such metrics could be linked with behaviors of the SUT and data produced by the SUT offline or at
+runtime. A test for a REST API can be regarded as a sequence of HTTP requests, e.g., a sequence
+of POST /foo and GET /foo/42 as shown in Figure 4. In order to perform actions on the SUT, each
+request has concrete values (referred as test data, e.g., 42) for its parameters, such as path parameters,
+query parameters and body payload, if specified in the schema. In addition, endpoints of REST APIs
+might be restricted with authentications, and the REST API could also connect to databases and
+external web services (as shown in Figure 4). How to configure the authentication and handle such
+external services are also part of REST API testing.
+To study the existing approaches of REST API testing, we designed RQs 4--7 and reported results
+of our investigation on metrics which include test criteria and heuristics (Section 6.1), techniques
+(Section 6.2), kinds of testing which have be applied for (Section 6.3), and available artifacts used in
+the empirical evaluations (Section 6.4).
+
+6.1
+
+RQ4: What metrics are used to evaluate the effectiveness of the testing?
+
+With this SLR, based on the selected papers, we classified metrics into three types, i.e., coverage
+criteria, fault detection and performance, as shown in Figure 5, and statistics of each type are shown
+in Figure 6. Those are discussed next in more details.
+6.1.1
+
+Coverage Criteria
+
+(1) schema related coverage
+Figure 4: High-Level View of REST API Testing
+
+Figure 5: Metrics employed for REST API Testing in the literature
+20
+30
+
+n: 30
+
+n: 17
+n: 16
+n: 14
+
+n: 9
+n: 5
+5
+n: 12
+
+schema cov
+
+code cov
+
+other
+
+5xx
+
+incon schema
+
+violating rule
+
+performance
+
+Figure 6: Statistics of metrics employed in automated testing of REST API
+API schemas are main inputs to guide how to access the SUT and define what responses should be
+returned. For instance, as an example of the schema defined with the OpenAPI (Figure 1), an endpoint
+could be defined under a URI path with an HTTP verb (e.g., POST, GET), input parameters (e.g., Path
+Parameter) and possible responses (e.g., status code, response body). Then, there exist several black-box
+coverage metrics which are defined based on those elements [62, 121, 126, 86, 150, 149, 161, 113, 47]:
+• HTTP status code could reflect a result of processing the request in the SUT, such as 2xx often
+represents a successful request. A set of testing criteria has been defined in order to compute a
+coverage of status codes which are returned during testing, for each endpoint [82, 51, 50, 59, 126,
+154].
+• path provides info to access the API, i.e., the full URI to access an endpoint could be constructed
+by base path plus path. For instance, Martin-Lopez et al. [124] defined path coverage which
+assesses a number of paths accessed by the generated tests out of the total available paths in the
+schema. Banias et al. [62] evaluated paths tested by considering success and failure responses
+received by requests to the path. Ed-douibi et al. [86] reported endpoint coverage, and an
+endpoint is considered as covered only if all of its operations are covered.
+• operations are exposed to make requests (i.e., HTTP verb with path) for performing actions on
+the services. As discussed, a test is regarded as a sequence of the operations. To evaluate REST
+API testing approaches, Banias et al. reported a number of operation tested in [62].
+• input parameter is info required to set when making a request. The parameter could be different
+with various types and constraints (e.g., required, minimum). Then the input parameter based
+metrics are defined to assess if various values for the parameters have been examined during
+testing (e.g., each boolean parameter should had been evaluated with both values true and
+false). The generation could also be guided by the metrics, e.g., Banias et al. [62] defined
+various configurations to generate tests with a consideration of the required property of the
+parameters.
+• response defines a list of possible responses to return per operation. Metrics relating to responses
+are used to examine whether various responses have been obtained (e.g., for an enumeration
+element in a returned body payload, coverage metrics would check if every single item in the
+enumeration has been returned at least once). Response body property coverage is reported to
+assess API schema based REST API testing approach in [62].
+In addition, Martin-Lopez et al. [124] proposed 10 coverage metrics based on the schema that
+have been applied for assessing REST API testing approaches in [62]. The 10 coverage metrics enable
+assessments of generated tests in fuzzing REST APIs with different inputs and outputs, such as
+parameter coverage, content-type coverage, response body properties coverage. The metrics were also
+enabled in fuzzers, such as HsuanFuzz [149] and RESTest [126]. Restats [81] is a test coverage tool
+for assessing given tests based on the coverage metrics. In an empirical study [80], such schema related
+coverage metrics were employed to compare black-box fuzzers of REST APIs.
+(2) code coverage
+Code coverage is one typical white-box criterion for evaluating testing approaches. It was applied as
+well to evaluate REST API fuzzers for both black-box [58, 59] and white-box [170, 51, 165, 53, 167, 166].
+Among different code coverage criteria, line/statement coverage is one of the most common and
+supported ones in industry-strength coverage tools (e.g., JaCoCo for Java programs).
+Code coverage was also used as an evaluation metric to assess the black-box REST API testing
+approaches [110, 113, 59, 149]. For instance, in [59], Atlidakis et al. reported accumulated code
+coverage achieved along with a number of requests to be executed. To collect the code coverage,
+TracePoint hook was configured in Ruby classes to trace the execution in this study. However,
+black-box testing of REST API could be performed on remote public APIs which are closed source
+software. The code coverage in this context is applied only for evaluation purposes.
+Code coverage could also be employed as a criteria to automate fuzzing, which is considered
+as white-box testing. EvoMaster enables runtime code coverage (with heuristics to maximize it)
+automatically during fuzzing with code instrumentation. However, such automated collection of
+runtime code coverage is specific to the programming language, and EvoMaster has enabled it for
+JVM (e.g., Java and Kotlin) [50] and JavaScript [168]. In addition, Pythia [58] employs the metrics
+of code coverage to produce tests. But, to enable such code coverage collection, it needs a pre-manual
+step to extract code info (such as block location) of the SUT.
+(3) other metrics
+Besides schema-based and code coverage, there also exist other metrics specific to proposed
+approaches [76, 150, 137, 67, 77, 113, 163, 112, 95, 114, 125, 116].
+For instance, in RESTler [59], a grammar is derived based on the API schema for driving
+following test sequence generation, e.g., selecting next HTTP request based on the derived producerconsumer dependencies among the endpoints. A specific metric employed in this approach is based
+on the grammar, i.e., grammar coverage. Martin-Lopez et al. [122, 123, 125] defined inter-parameter
+dependencies which represent constraints referring to two ore more input parameters. Such dependencies
+are also used in RestCT to generate test data [160]. Alonso et al. [150] enabled test data generation
+with realistic inputs using natural language processing and knowledge extraction techniques. The
+performance of the data generation was evaluated from a percentage of valid API calls (i.e., 2xx
+status code) and valid inputs (i.e., Syntactically valid and Semantically valid ). In [97], Godefroid et al.
+introduced the error type metric which is a pair of error code and error message. The metric was used
+to guide data fuzzing of REST API [97], i.e., maximizing error type coverage.
+Chakrabarti and Rodriquez [76] defined POST Class Graph (PCG) to represent resources and
+connected relationships among them, then tests could be produced by maximizing coverage of the
+graph. UML state machine was applied in a model-based testing of REST APIs [137]. Metrics specific
+to model such as state coverage and transition coverage are used to guide test generation.
+Lin et al. [110] constructed tree-based graph to analyze resource and resource dependency based
+on the API schema and responses. Then test cases could be generated based on the graph with tree
+traversal algorithms.
+To analyze security issues existing in REST API, Cheh and Chen [77] analyzed levels of sensitivity
+of data fields and API calls, and also defined exposure level that calculates a degree of such data fields
+and API calls exposed to potential attacks.
+6.1.2
+
+Fault Detection
+
+(1) service error
+The status code 5xx has been applied to identify potential faults in REST API testing [82, 62,
+170, 139, 108, 51, 121, 146, 126, 103, 154, 59, 50, 169, 86, 165, 53, 150, 160, 166, 55, 149, 100, 113, 58,
+65, 54, 52, 47, 125]. With HTTP, the status code 5xx indicates errors caused by the server, and the
+request could not be processed until the server has been fixed. For instance, 500 status code is generic
+to represent that an internal server error occurs when performing the given request. The status 503 is
+more specific, stating that the service is unavailable, e.g., due to down for maintenance or the server is
+overloaded.
+In most HTTP frameworks, when there is a crash in the business logic due to some faults (e.g., an
+unhandled null-pointer exception), the entire server does not crash. In these cases, the server would
+still reply to the incoming HTTP request, responding with a status code of 500. Therefore, 500 status
+codes in the responses can be used as an oracle to detect faults in RESTful APIs [100]. However, not
+all 500 status codes are related to software faults. For example, if the API is connecting to a database,
+and the database is currently down, the server would not be able to complete the request. In such a
+case, returning a 500 status code would be correct, although no software fault in the API is involved.
+(2) violation of schema
+The API schema (such as OpenAPI) defines response syntax for each operation [82, 170, 108, 51, 121,
+146, 154, 86, 165, 53, 166, 55, 54, 52], e.g., status code and response body. Actual responses should be
+always consistent with the syntax specified in the schema. Thus, any inconsistency between the actual
+response and the syntax could be regarded as faults in the REST API. For instance, Viglianisi et al.
+defined such oracles in RestTestGen [154] by using an OpenAPI library15 to identify the mismatched
+responses. In QuickRest [103], Karlsson et al. formulated such consistency as properties. EvoMaster
+also reports the number of such faults at the end of fuzzing [55].
+(3) violation of defined rules
+Service errors (based on status code) and violation of schema (based on OpenAPI) are general
+oracles for fault finding in the context of REST API. Besides, there also exist some oracles to identify
+faults based on rules which characterize the REST APIs in terms of security, behavior, properties and
+regression [108, 60, 103, 157, 141, 104, 89, 150, 63, 100, 77, 65, 163, 116] (see Figure 5).
+Security. As web services, security is critical for REST APIs. To enable test oracle relating to
+security, Atlidakis et al. [60] proposed a set of rules which formalize desirable security related properties
+of the REST APIs. Any violation of the rules is identified as potential security related bugs in the
+SUT. The rules are mainly defined based on assessing accessibility of resources, such as use-after-free
+rule: if a resource has been deleted, it must not be accessible anymore.
+Katt and Prasher [165] proposed an quantitative approach to measure the kinds of security related
+metrics (i.e., vulnerability, security requirement and security assurance) for web services. To calculate
+the metrics, test cases are defined for validating whether the SUT meets security requirements and any
+kind of vulnerabilities exists. Masood and Java [128] identified various kinds of vulnerabilities which
+could exist in REST APIs, such as JSON Hijacking. Such vulnerabilities could be detected with both
+static analysis and dynamic analysis techniques. Barabanov et al. [63] proposed an approach specific
+to detection of Insecure Direct Object Reference (IDOR)/Broken Object Level Authorization (BOLA)
+vulnerabilities for REST APIs. The approach analyzes the OpenAPI specification by identifying
+its elements (such as parameters) relating to IDOR/BOLA vulnerabilities, then generates tests for
+verifying the API with such elements using defined security rules. Zha et al. [163] collected Common
+Sense Security Policies (CSSP), such as Access control, URL spoofing and private messages for Team
+Chat system and defined CSSP violation scenarios. Security and privacy risks can be identified if an
+API under the CSSP violation scenarios can still work, e.g., return a valid response. Barlas et al. [65]
+studied regex-based denial of service (ReDoS) vulnerabilities lead by handling of input sanitization in
+https://github.com/bjansen/swagger-schema-validator
+web services. The vulnerabilities is allowed to be identified by verifying consistency between client-side
+and server.
+Behavior. Based on the provided API schema, Ed-douibi et al. [86] defined two rules to generate
+nominal test cases and faulty test cases. The nominal test cases take the inputs inferred based on
+examples or constraints in the schema, and the successful response is expected to return (e.g., assert
+that the status code is 2xx). Regarding the faulty test cases, it takes invalid inputs (e.g., missing
+required parameters, a string for a number parameter, a string violating its defined pattern), and the
+client error response is expected to return (e.g., assert that the status code is 4xx).
+Liu et al. [112] constructed five constraints of REST guidelines with models. Then such models
+could be used to verify design models of REST APIs. Any violation of the constraint models is
+considered as a potential defect in its architecture design.
+Pinheiro et al. [137] defined UML state machines for modeling behaviors of REST APIs. The actual
+behavior (by executing the tests) should be consistent with the model (e.g., guard condition, invariant)
+as expected. Any inconsistency is recognized as potential faults of the SUT.
+Properties. Most of the HTTP methods are idempotent, i.e., GET, PUT, DELETE, HEAD,
+OPTIONS and TRACE. For such methods, a result of executing the method is independent with the
+number of repeated times, i.e., executing the method multiple times would not change the result as
+executing it one time. Thus, assertions could be defined to check the idempotency [151], e.g., executing
+multiple identical GET should result in the same response, after a successful DELETE, responses of
+all following identical DELETE should be same. Connectedness is examined in [76] that refers to
+accessibility among resources. For instance, assume that resource X owns resource Y, when perform a
+GET collection on Y referring to X, all available Y should appear in the response, otherwise the REST
+API is not ‘‘connected’’.
+The REST API could apply HATEOAS (Hypermedia as the Engine of Application State). Then
+the response might contain hypermedia links for accessing itself or other resources. For such responses,
+Vassiliou-Gioles [151] defined assertions for validating availability of links in its response. In [156, 155],
+Vu et al. also proposed a model-based approach which enables formalization of hypermedia behaviors
+of the REST API with ε-NFA, and the model could allow an identification of the faults by checking
+whether the SUT complies with it [157]. Fertig and Braun [89] also verified the REST APIs based on
+hypermedia constraints using model-based approaches.
+Metamorphic relations capture necessary properties which the SUT should hold with multiple
+executions. To enable metamorphic testing of REST APIs, there exist several works to identify such
+metamorphic relations of the web services with abstract Metamorphic Relation Output Patterns
+(MROPs) [141, 117] (such as equivalence, disjoint) or specific properties of the API [114]. Then, faults
+could be detected by checking whether responses among the multiple requests conform to the identified
+relations.
+Regression. Gazzola et al. [95] enables monitoring and tracing of the microservices in order to
+record their execution. Such recorded execution slices can be abstracted and considered as a metric
+for generating regression tests, i.e., verify whether the same response could be received with the same
+request in the further version of the SUT. Godefroid et al. [98] employed RESTler to produce tests,
+then enabled detection of regression faults by comparing behaviors with the same tests among different
+versions of the REST APIs.
+6.1.3
+
+Performance Metrics
+
+Performance related metrics are also important for REST API testing, as the SUT provides services over
+the network. In [62], Banias et al. measured average response time of the requests generated by different
+strategies. Fertig and Braun [89] discussed potential solutions to enable performance testing with modelbased approaches and existing techniques (such as Apache JMeter16 ). Schemathesis [100] defined
+the proprieties relating to performance metrics, i.e., identify slow response and request amplification
+with configured thresholds. Bucaille et al. [73] developed a testing framework which can assess and
+monitor performance-related properties, such as latency, by sending requests from various geographical
+https://jmeter.apache.org/
+Table 5: Results of techniques for automated testing of REST APIs
+Black-/White- box
+
+#
+
+Tehcniques
+
+#
+
+Papers
+
+Black Box
+search
+model
+property
+others
+8
+28
+
+Both
+Hybrid
+White Box
+1
+search
+search
+search
+others
+1
+3
+
+[111]
+[126, 157, 86, 89, 107, 137, 112, 155]
+[103, 141, 107, 76, 100, 67, 117, 114, 116]
+[82, 62, 108, 129, 151, 60, 105, 154, 97, 171, 59, 98,
+150, 73, 160, 110, 63, 149, 134, 77, 161, 113, 65, 163,
+115, 130, 95, 125]
+[51]
+[121]
+[170, 139, 146, 50, 169, 165, 53, 166, 55, 54, 52, 47]
+[148, 58, 168]
+
+Total
+Note that we only considers the papers which contribute to propose new approach for automated testing of REST APIs.
+
+locations using different cloud service providers.
+RQ4: Fault detection was the most applied metric in REST API testing that can be identified based
+on 5xx status codes, the given API schema and defined rules. Coverage criteria were the second
+widely applied metrics that measure the degree to which aspects of the REST APIs are tested. In the
+context of REST APIs, besides the traditional code coverage in white-box testing, schema based
+coverage was mainly employ in the black-box testing. Performance metrics were rarely investigated
+in REST API testing.
+
+6.2
+
+RQ5: What techniques are used for automatically testing RESTful APIs?
+
+To answer this question, we conducted further analysis on 61 (out of 92) papers whose contributions
+are categorized as ‘‘new automated approach and its extension’’ (see Section 5.3).
+6.2.1
+
+Black-box and White-box Testing
+
+Based on our survey, there exist two main types of testing techniques to automate testing of REST
+APIs, i.e., black-box and white-box. Regarding black-box testing, it enables to verify systems’ behaviors
+with exposed endpoints, e.g., checking responses of an HTTP request. The verification and validation
+of REST APIs with black-box technique are mainly driven by exploiting the API specification and
+returned responses. Based on the results of this survey (see Table 5), 73% of the existing approaches
+are in the context of black-box testing.
+Regarding the black-box fuzzers, bBOXRT [108] aims at testing of REST APIs in terms of its
+robustness. EvoMaster applies search-based techniques by defining fitness function with black-box
+heuristics in a black-box mode [51], such as status code coverage and faulty status code (i.e., 500), to
+generate tests. There are also a set of property-based testing approaches that identify properties of
+REST APIs as test oracle problems, such as QuickRest [103] and Schemathesis [100]. For instance,
+in terms of the API specification, QuickRest and Schemathesis both identify consistency with
+the specification as the properties. Schemathesis also explores semantic properties of REST APIs,
+such as GET should fail after an unsuccessful POST when they perform on the same resource. Moreover,
+dependencies of REST APIs are studied for REST API testing. For instance, RESTler [59] infers
+and handles dependency among endpoints to generate effective tests based on the API specification
+and runtime returned responses. RESTest generates tests by exploring inter-parameter dependencies
+of REST APIs. With RestTestGen [82, 154], Operation Dependency Graph is proposed to capture
+data dependencies among operations of a REST API. The graph is initially built based on its OpenAPI
+schema then further extended at runtime. Morest [113] formalized a property graph to construct
+relations of operations and object schema, and such a graph could be derived based on the API schema
+then dynamically updated based on responses at runtime. Within a specified time budget, test cases
+could be initially generated by traversing the graph, and any update of the graph would result in
+new tests. Furthermore, RestCT [160] is a combinational approach, integrating two phases that
+facilitate generating orders of operations then concertizing input parameters of operations. The orders
+are generated based on HTTP action semantics with greedy algorithm, e.g., for a specific resource, its
+GET operation should not appear before its POST and after its DELETE. The concrete values of input
+parameters could be produced in various ways, such as random, previous responses, specified examples
+or inter-parameter dependencies. In the context of black-box testing, Cheh and Chen [77] enabled
+a semi-automatic approach to identify security issues in the API schema. Navas [130] proposed an
+approach to infer and validate the API schema, such as misnamed and duplicated elements in response
+schema.
+Compared to black-box testing, white-box techniques could enable testing of internal behaviors of
+the REST APIs with additional metrics relating to source code, such as code coverage. For example,
+Pythia [58] employs code coverage heuristics to guide test generation. The code coverage could
+be collected by pre-configuring locations of basic blocks in its implementation with static analysis.
+EvoMaster is a fuzzer which has a white-box mode, and the white-box testing is enabled by code
+instrumentation for JVM [50, 49] and NodeJS programs [168] developed in the fuzzer. The code
+instrumentation allows to identify the code to cover and collect code coverage at runtime. With such
+info, EvoMaster defined white-box heuristics and applied search-based techniques to fuzzing REST
+APIs. With this SLR, we found that all other white-box testing techniques are built on the top of
+EvoMaster platform (i.e., [170, 139, 146, 50, 169, 148, 165, 53, 166, 155, 47]) with new algorithms
+and new techniques.
+There also exist hybrid approaches which combine black-box and white-box [121]. For instance,
+Martin-Lopez et al. [121] proposed a solution by integrating two fuzzers (i.e., RESTest and EvoMaster). A motivation of having such a hybrid approach as described in the paper is that inputs of a
+REST API are restricted with constraints, and the constraints are not specified in the API schema.
+Without the info of constraints, generating successful requests (i.e., receiving a response with 2xx
+status) is not trivial. However, white-box testing approach could tackle this problem by identifying
+the constraints with source code, such as EvoMaster [55, 54]. In [121], RESTest is firstly employed
+to generate tests in the context of black-box testing, then the generated tests would be regarded as
+seeds that EvoMaster starts with. With the four selected REST APIs, the hybrid approach achieved
+the best results compared to isolated black-box and white-box solutions.
+6.2.2
+
+Search-based Testing
+
+Search-based testing aims at solving software testing problems with metaheuristic search techniques,
+such as Genetic Algorithms and Swarm Algorithms. In order to enable the search techniques, it needs
+to reformulate the addressed testing problem as a search problem.
+EvoMaster is a search-based fuzzer that reformulates test case generation as search problems
+supporting both black-box and white-box mode. The black-box mode is achieved with Random strategies
+with black-box heuristics, such as coverage of operations and status code. The white-box mode is
+enabled with novel techniques (e.g., code instrumentation [50], testability transformations [55, 54] and
+SQL handling [52, 53]) which allows to define white-box heuristics as part of fitness function. For
+instance, code instrumentation enables identification of lines and branches to cover as testing targets
+and collecting such coverage at runtime, and testability transformations provide better guidelines
+to search for maximizing the testing targets. Many independent objectives algorithm (MIO) is the
+default algorithm in white-box mode of EvoMaster. MIO is an evolutionary algorithm developed
+specific to white-box system test generation, and the algorithm is inspired by (1+1)EA [85] that
+contains sampling and mutation operators. Its effectiveness to test REST APIs has been demonstrated
+in several papers [49, 50, 56]. To be specialized for Web API testing and REST API domain,
+MIO is further extended with adaptive hypermutation [165], smart sampling [50] and resource-based
+techniques [170, 169].
+Genetic Algorithms (GAs) were also enabled for REST API testing. For instance, the Whole
+Test Suite [92] employed genetic algorithm to enable automated test suite generation. With the
+GA, the approach evolved the test generation with mutation and crossover operators, and the fitness
+function is defined with an overall single objective using white-box heuristics. Instead of single-objective
+optimization, Many-Objective Sorting Algorithm (MOSA) extends NSGA-II [84] for handling test
+generations with respects to maximizing many testing targets as many-objective optimization. WTS
+and MOSA have been integrated into EvoMaster which allows to apply them to tackle REST
+API testing [49]. With the EvoMaster platform, Stallenberg et al. [146] employed Agglomerative
+Hierarchical Clustering (AHC) to identify patterns of tests, then extended MOSA (named LT-MOSA)
+to generate tests with the patterns. Aside from test generation, Liu and Chen [111] employed genetic
+algorithm to optimize test data of REST APIs in the context of mutation testing.
+Moreover, Swarm Algorithms were also investigated. Sahin [139] proposed a Discrete Dynamic
+Artificial Bee Colony with Hyper-Scout (DABC-HS) algorithm which was introduced to address
+shortcomings of a basic Artificial Bee Colony (ABC) for REST API testing. Furthermore, a Greedy
+Algorithm was applied in RestCT to produce operation sequences [160].
+6.2.3
+
+Property-based Testing
+
+Property-based testing is an approach which validates and verifies the SUT based on identified
+properties that should always abide by the SUT. In the context of REST API testing, one type of
+properties could be identified based on schema, such as check if the responses during testing conform
+to the schema [103, 100]. In addition, as REST, it defines a set of guidelines on how to access resources.
+Then, states of resources in REST API are captured as properties of REST APIs. For instance,
+QuickRest [103] defined stateful properties of REST API with documented responses for producing a
+stateful sequence of operations. Seijas et al. [107] generates finite state machines to construct changes
+of states of resources, then employed Quviq QuickCheck for enabling property-based testing of REST
+APIs. Chakrabarti and Rodriquez [76] examined connectedness of resources in testing REST APIs.
+There also exist some work for exploring semantic of REST APIs. For instance, in Schemathesis,
+Hatfield-Dodds and Dygalo [100] derived structural and semantic properties of REST APIs relating to
+constraints, security and performances. Metamorphic testing was also enabled in REST API testing
+that identified metamorphic relations of the REST API based on their semantics [141, 117, 114].
+6.2.4
+
+Model-based Testing
+
+Model-based testing is to employ models to perform testing. The models are typically constructed
+manually before the testing for depicting the SUT, such as states, behaviors. For instance, Vu et
+al. [157, 155, 156] proposed a model-based testing approach which uses an ε-NFA to construct
+hypermedia behavior of the REST API. Fertig and Braun [89] developed a Domain Specific Language
+(DSL) for constructing models of REST APIs, then defined a set of test templates for test generations
+with such models.
+In [112], Liu et al. proposed a model-based approach for verifying REST service architecture
+using colored Petri Nets (CPN). Five REST feature constraints are defined with CPN models. Such
+constraint models allow a verification of architecture models using simulation. Pinheiro et al. [137]
+constructed behaviors of REST API with UML state machines.
+Moreover, the models could also be used to construct the tests. Ed-douibi et al. [86] defined a
+metamodel for formalizing test suites of REST APIs. In the approach, the authors proposed a set of
+rules (e.g., infer parameter values based on examples, generate faulty test cases with invalid inputs) to
+generate the test suite model based on the OpenAPI. Then the generated test suite model is further
+converted to execute code (e.g., JUnit) for performing the requests against the SUT.
+6.2.5
+
+Others
+
+Graphs were constructed in several works for capturing structures and relationships of REST APIs.
+Then, for example Breadth-First Search (BFS) can be employed for generating tests based on such
+graph [59].
+Gazzola et al. [95] proposed an approach ExVivoMicroTest which facilitates regression test
+generation by recording service interactions at runtime. Godefroid et al. [98] proposed an approach for
+detecting faults due to changes made among different versions of RESTful web services. Such faults
+could be identified by comparing behavior of different versions with the same inputs generated by a
+fuzzer RESTler.
+Takeda et al. [148] developed test case extraction approach which aims at identifying impacts of
+migration of APIs to microservices from monolithic architecture. The impacts are derived by analyzing
+source code in the context of white-box testing.
+RQ5: Both white-box and black-box techniques were investigated for tackling testing of REST API,
+and most of existing approaches (i.e., 73%) are black-box. With black-box testing, property-based and
+model-based testing were widely employed that identify characteristics of the REST APIs (such as
+properties and behavior) to facilitate automated testing. White-box testing of REST APIs was
+mainly addressed by search-based techniques.
+
+6.3
+
+RQ6: What kind of testing has been automated for RESTful APIs?
+
+To find out what kinds of testing have been conducted by the papers and what are their frequencies,
+we extracted relevant data and analyzed them. The results of our findings are shown in Table 6. Not
+all the papers necessarily conduct only one testing type and they might cover more than one of them
+(e.g., unit testing, integration testing and acceptance testing are covered by [68]). With this SLR, we
+discovered 8 testing types in the context of REST API testing which had been investigated by the
+papers. More details about these types are discussed as follows:
+• System Testing
+System testing is a type of testing that verifies a software product’s integration and completion.
+A system test’s objective is to gauge how well the system requirements are met from beginning
+to end. Most of the papers (i.e., 72 out of 92) we found are either focusing solely on this type
+(e.g., [129]) or are conducting it along with other types. As the REST is a guideline to build the
+web services and current techniques (e.g., OpenAPI) enables necessary info to perform system
+testing (e.g., make the request to REST API), it is expected that the system testing is the most
+addressed problem in REST API testing.
+• Security Testing
+The fundamental objective of security testing is to determine the system’s risks and assess any
+potential vulnerabilities, so that threats can be confronted and the system can continue to operate
+without being compromised. As an example, the study by Cheh and Chen uses the standardized
+OpenAPI specification as an input and suggests a semi-automatic method to deduce different
+significant details regarding the security flaws in that API definition [77]. Security testing of
+REST APIs is of great importance. As it is mentioned in Section 1, many large enterprises rely
+on REST APIs. However, there have reportedly been a number of incidents involving web API
+security in recent years. The top three were denial of service attacks (19%), bot/scraping (20%),
+and vulnerabilities (54%) followed by authentication problems (46%). These flaws continue to
+exist until a hacker finds and takes advantage of them, which can lead to data loss, account
+abuse, or service interruption [45].
+• Integration Testing
+This stage examines whether collections of components function as expected by the technical
+system design or specification. We found some papers focusing on this kind of testing, such as
+the study by Vu et al. [155] which is aimed at automation of integration testing with the focus
+on hypermedia testing.
+• Unit Testing
+Unit testing is the process of testing a single units, small specialized section of code written by a
+developer. MockRest [143] is one tool focusing on unit testing by proposing a mock framework
+to help developers get a consistent response while the real REST API is down.
+Table 6: Different testing types and their frequencies among the papers
+Testing Type
+
+#
+
+Papers
+
+System
+Security
+Integration
+Unit
+Robustness
+Regression
+Architecture
+Acceptance
+8
+3
+1
+[82, 62, 170, 139, 108, 51, 121, 129, 80, 146, 126, 151,
+119, 105, 103, 154, 97, 171, 157, 59, 69, 50, 124, 169, 86,
+141, 89, 107, 76, 75, 81, 148, 165, 53, 167, 150, 73, 160,
+106, 166, 137, 110, 55, 118, 149, 120, 134, 100, 122, 67,
+161, 113, 58, 79, 65, 162, 115, 54, 52, 102, 57, 159, 117,
+47, 61, 111, 130, 114, 125, 156, 123, 168]
+[60, 104, 128, 63, 77, 163, 71, 101]
+[157, 158, 152, 153, 155, 144, 68, 145]
+[148, 143, 144, 68, 145]
+[82, 108, 154]
+[98, 95]
+[112]
+[68]
+
+• Regression Testing
+Regression testing is the process of ensuring that altered software continues to function as
+intended [88]. For example, in order to automatically find breaking changes across API versions,
+differential regression testing for REST APIs is presented in [98]. In this study, 2 papers tackle
+specific regression testing problems for REST API. Moreover, test cases produced by a fuzzer
+could also be used for regression testing. For example, EvoMaster automates system testing
+but the test cases generated by this tool can be used for conducting regression testing.
+• Robustness Testing
+Robustness testing aims to identify the extent to which a particular system or component can
+continue to operate properly in the presence of erroneous inputs or demanding environmental
+circumstances [19]. Fuzzers that aim at finding faults in the APIs might send invalid inputs on
+purpose to check if the API correctly returns an error message. One work focusing on robustness
+testing is [108], which performed this type of test over REST services based on the constraint
+information expressed in their OpenAPI specification.
+• Architecture Design Testing
+The only paper which we found conducting this kind of testing is the study by Liu et al. [112].
+This paper is aimed at enhancing system design’s quality by verifying whether an API conforms
+to the REST architecture constraints described in Section 2.1.
+• Acceptance Testing
+Acceptance testing is a formal testing procedure used to ascertain whether a system satisfies its
+acceptance criteria and to give the client the option of accepting the system or not. The study
+by Besso et al. is the only paper which covers this type of testing by conducting it against web
+service choreographies [68].
+As it is shown in Table 6, the frequency of papers which focus on system testing was much higher
+than those papers that necessarily require accessing to software components (e.g., integration test) or
+source code (e.g., unit test). As mentioned in Section 2.1, REST is a high-level design guideline, so it
+is understandable that most of the papers (i.e., 72) were focusing on system testing which is performed
+to determine a complete software system is working properly.
+RQ6: Existing studies in REST API testing covered 8 different testing types. Most of the studies
+(i.e., 72 out of 92) referred to system testing of REST API.
+50
+30
+10
+13
+Internet
+
+Local
+
+No Case Studies
+
+Both
+24
+
+Figure 7: Location of Case Studies Used for Empirical Evaluations and Their Frequencies
+
+6.4
+
+RQ7: What kind of artifacts are used for conducting empirical evaluations?
+
+In this section, we investigated what kind of artifacts researchers have used as case studies to
+empirically evaluate the effectiveness of their proposed approaches. Sound empirical evidence is needed
+to demonstrate the usefulness of a novel technique. The larger and more variegated a case study is,
+the more likely it will be that results would generalize to other systems.
+The results of our findings, including different categories of case studies and their frequency among
+the papers are displayed in Figure 7. When dealing with experiments on testing Web APIs, there are
+two main types of artifacts: (1) APIs run on a local machine; and (2) existing APIs available on the
+internet (e.g., ProgrammableWeb [27] currently lists more than 20 000 APIs).
+For the former type (i.e., APIs run on a local machine), those are typically open-source projects,
+hosted on open-source repositories such as GitHub. Local open-source project is the most common type
+of case studies used by 30% of the papers. For instance, case studies from EMB repository17 which
+includes a set of open source APIs are utilized by 17 papers as case study [170, 139, 51, 146, 50, 124,
+169, 165, 53, 167, 166, 55, 118, 162, 54, 52, 168]. There are cases in which local closed-source APIs are
+used for this kind of experiments, but it is a less common occurrence (i.e.,7%), as it typically requires
+academia-industry collaborations on joined research projects [93]. There are also papers which take
+advantage of both open-source and closed-source APIs by running them locally. This group consists of
+4% of the papers. In addition, several cases are witnessed in which some artificial example APIs are
+built by researchers to conduct empirical studies. These artificial artifacts are utilized by 16% of the
+papers.
+The latter type, which include 28% of the case studies, are typically industrial APIs providing paid
+services on internet, or free services from different government agencies. Some might be open-source, but
+those are a small minority. On this kind of APIs, typically only black-box techniques are investigated,
+as white-box techniques require access to the source code. For example, RestTestGen [82, 154]
+used 87 RESTful APIs available on internet for its empirical studies. However, one major drawback
+of using APIs on the internet is that experiments might not be repeatable, as APIs on the internet
+might change or disappear without any previous notice. There is also the case of [130], which uses
+case studies hosted on the internet along with artifacts developed by the researchers.
+https://github.com/EMResearch/EMB
+Finally, there are a considerable number of papers which did not perform any empirical evaluations.
+14% of papers, such as the 4 papers which their main contribution is of type ‘‘Proposal or idea’’ did
+not conduct any empirical evaluations. There are also papers which are not of type ‘‘Proposal or idea’’,
+but did not make use of any case studies for empirical evaluations, such as the study by Pinheiro et
+al. [137].
+RQ7: The most common group of case studies are local open-source projetcs and APIs on the
+Internet which are used by 30% and 28% of the papers, respectively. We also discovered that 14% of
+the papers do not use any case studies.
+Tools for Testing RESTful APIs
+
+7.1
+
+RQ8: Which research tools are open-source?
+
+Table 7: Information of open-source research tools have been developed for REST API testing
+
+Tool
+
+Website
+
+#
+
+Papers
+
+Programming Language(s)
+EvoMaster
+
+[8]
+Java, Kotlin, C#, TypeScript, Javascrip
+RESTest
+
+[33]
+3
+
+Restler
+
+[34]
+4
+6
+8
+10
+12
+14
+16
+
+RestTestGen
+bBOXRT
+Schemathesis
+RestCT
+Jsongen
+RESTApiTester
+DeepLearningBasedTool
+Api Tester
+Restats
+Gadolinium
+Hsuan-Fuzz
+Instance Identification
+ExVivoMicroTest
+
+[35]
+[4]
+[36]
+[32]
+[22]
+[29]
+[7]
+[2]
+[31]
+[14]
+[18]
+[20]
+[10]
+4
+2
+1
+1
+1
+1
+[170, 139, 51, 121, 146, 50,
+169, 165, 53, 167, 106, 166,
+55, 118, 54, 52, 57, 47, 168]
+[121, 80, 126, 167, 150, 106,
+120, 125]
+[80, 60, 97, 59, 98, 167, 106,
+65]
+[82, 80, 154, 167, 106]
+[108, 80, 167, 106]
+[167, 106, 100]
+[167, 160]
+[67, 61]
+[62]
+[129]
+[86]
+[81]
+[73]
+[149]
+[152]
+[95]
+
+Java
+Python, F#
+Java
+Java
+Python
+Python
+Erlang
+Java
+Python
+Java
+Python
+TypeScript, JavaScript
+Go
+Go
+Python
+
+Typically, a scientific article does not have the space to fully describe in details all the low level
+details of a new presented technique. Releasing the implementation of a new research prototype as
+open-source not only helps in this aspect, but it is also helpful to enable replicated studies (as reimplementing everything from just an article description can be a major engineering task). Furthermore,
+open-source tools, if maintained and properly engineered, can be used by practitioners to reduce the
+gap between academic research and industrial practice.
+Studies that have their tool released as open-source, or use existing open-source tools for comparisons,
+are listed in Table 7, along with the programming language(s) the tools are implemented with. Note
+that, in some cases, studies extend on existing open-source tools, but no info is provided on whether
+the extension is available as open-source. Also, it might happen that a tool is released as open-source
+only after a scientific article is published. We have included these cases as well, but due to the lack
+of precise information (e.g., URL links might not be explicitly stated in the articles) we might have
+missed some.
+Overall, it can be observed that 16 tools have either been compared or released by 44 papers.
+EvoMaster is the one which the highest number of papers. 19 papers are either presenting it or
+proposing a new technique which is integrated into it or using it for comparison with other tools. The
+second most common tools are RESTest and RESTler, used in 8 papers.
+It can be seen that Java and Python have been the most common programming languages, used by
+6 open-source tools each.
+RQ8: 16 research tools have been released as open-source based on research outcomes of REST
+API testing. EvoMaster is the most used tool which have been studied, extended and compared
+with other tools, and RESTest and RESTler are the second most ones. Java and Python are the
+most applied programming language for developing the research tools.
+
+7.2
+
+RQ9: Which non-research tools are used/compared?
+
+REST APIs are widely used in industry, and their testing is a concrete issue that needs to be addressed,
+as it has practical value. Therefore, besides the work from the research community, it is not surprising
+to see effort from engineers and practitioners in industry to address this problem. Our goal here is not
+to survey all the non-research work done on the topic, but rather to analyze what academics found
+important and relevant enough to cite and use in their studies. Note that, with the term ‘‘non-research’’
+we loosely mean all the software tools and libraries developed by practitioners in industry, without any
+published scientific article (as far as we know) describing them.
+The aim of this research question is to find out what are the non-research tools and libraries that
+have been used in our surveyed studies. Those should be either specific to test REST APIs (e.g.,
+API fuzzers), or can be used for testing REST APIs (e.g., code coverage tools). The tools we found
+are listed in Table 8. We found a larger number of non-research tools being used or compared in
+the papers, but they all were not relevant to software testing or REST APIs domains. For example,
+WSFuzzer 18 is a tool used by one of the papers [115], but it is aiming at SOAP APIs, as the paper
+covers this type of APIs as well. With this SLR, we found two kinds of non-research tools have been
+used in REST API testing, i.e., library, and toolkit.
+There exist two libraries which have been used in testing of REST API. Being utilized by 12
+papers, RestAssured [30] is the most used non-research tool which facilitates doing HTTP calls against
+REST API and validating responses. RestAssured is mainly applied in tests generated by fuzzers, such
+as EvoMaster [50] and RESTest [121]. Swagger Schema Validator [41] is another library which
+validates JSON objects against Swagger 2 which is utilized by response validation oracle to assess the
+automated test case generation [82].
+There are variety of toolkit for testing of REST API. For instance, Postman[26] is a platform for
+building and testing APIs, such as test execution and result validation. For REST API testing, tests
+can be specified as Postman format, and such tests can be created manually or automatically by fuzzers.
+For instance, EvoMaster supports Postman tests as seed for automated test case generation [121].
+Fuzz-lightyear [11] is a framework for stateful fuzzing. It maintains the state between requests, allowing
+us to put together a request sequence, design it to simulate a malicious attack vector, and use it to
+notify of unexpected success. Go-fuzz [15] is also a framework to enable fuzzing in applications written
+in Go language. Burp Suite [5] is a commercial fuzzer for security testing that is utilized by 2 papers.
+TnT-Fuzzer [43] is an open-source tool for testing robustness which is taken advantage of for evaluation
+by 2 papers [100, 79]. SoapUI [37] is an application to perform automated end-to-end tests on a variety
+of web-services, including REST APIs to test their performance and security. Tcases [42] is another
+tool that performs black-box model-based testing based on OpenAPI specifications. SpotBugs [38] is a
+tool which enables static analysis of codes written in Java. Dredd [23] is an API testing tool which
+conducts sample-value-based testing technique and validates responses based on status codes, headers
+and body payloads. Autorize [3] is another tool focusing on security which detects authorization
+enforcement within a REST API. ZAP [44] is a web application scanner tool focusing on security testing
+by performing penetration testing. Rest of the tools are fuzzers which depend on OpenAPI/Swagger
+schema.
+RQ9: 20 non-research tools were identified from the selected 92 papers for REST API testing, in
+which RestAssured was the most used/compared by 12 papers.
+https://sourceforge.net/projects/wsfuzzer/
+Table 8: Information of non research tools which have been applied in REST API testing
+Tool
+
+Website
+
+Description
+
+#
+
+Papers
+RestAssured
+
+[30]
+
+DSL for writing tests in Java
+2
+
+[41]
+
+Validates JSON objects against Swagger 2
+3
+5
+7
+
+Swagger Schema Validator
+Postman
+Burp Suite
+SoapUI
+APIFuzzer
+Fuzz-lightyear
+
+[121, 126, 50,
+165, 53, 55, 54,
+52, 71, 47, 125,
+168]
+[82, 154]
+
+[26]
+[5]
+[37]
+[1]
+[11]
+2
+2
+[121, 126]
+[81, 79]
+[73, 130]
+[106, 100]
+[63, 100]
+9
+TnT-Fuzzer
+SpotBugs
+Dredd
+
+[43]
+[38]
+[23]
+1
+[100, 79]
+[108]
+[106]
+Tcases
+
+[42]
+[106]
+Autorize
+
+[3]
+[63]
+14
+Go-fuzz
+Got-Swag
+Cats
+
+[15]
+[16]
+[6]
+1
+[149]
+[100]
+[100]
+17
+19
+Swagger-conform
+Fuzzy-swagger
+Swagger Fuzzer
+Fuzzapi
+ZAP
+
+[39]
+[13]
+[40]
+[12]
+[44]
+
+Client tool for testing APIs manually
+Commercial security testing fuzzer
+Web-service testing application
+Fuzzer tool based on OpenAPI
+Stateful fuzzing framework based on OpenAPI
+Open-source robustness testing tool
+Static analysis tool for Java code
+Validates responses based on status codes,
+headers, and body payloads
+Black-box model-based testing based on OpenAPI
+Authorization enforcement detection tool (Extension for Burp Suite)
+Randomized testing for Go
+Monkey testing for APIs based on Swagger
+Fuzzer and negative testing tool based on
+OpenAPI
+Tests if API conforms to Swagger schema
+Fuzzer based on Swagger
+Fuzzer based on Swagger
+Open-source general-purpose HTTP fuzzer
+Penetration Testing Tool For Web Apps
+1
+1
+[100]
+[100]
+[100]
+[79]
+[115]
+
+7.3
+
+RQ10: Which features are supported by the research prototypes?
+
+To get better understanding of the current state-of-the-art, we investigated what features are supported
+by the research prototypes. This can also help practitioners to evaluate these prototypes. To answer
+this research question, we collected features supported by the 16 open source tools which we identified
+(see Section 7.1). Based on the collected features, we then divided them into five main categories as
+shown in Table 9. The identification of features is based on what reported in the published papers of
+these tools, and their online documentation (if any is available). At times, the needed information is
+either unclear of missing. For example, a tool could state that it generates ‘‘test cases’’, but no info
+seems provided on the language and format of these output test cases in the documentation.
+OpenAPI is supported by most of the tools (i.e., 12 out of 16) as a supported format of REST API
+schema. The tools take the OpenAPI specification as an input to identify endpoints of the REST API.
+It has also been taken advantage of alongside other information such as HTTP logs in Restats and
+visualized data (i.e., charts) in Gadolinium [73].
+Regarding what the released prototypes output, test cases are the most common one and among
+them, JUnit is the most employed one. Since EvoMaster supports other programming languages
+(i.e., C# and Javascript) it also supports tests written in these languages (e.g., xUnit and Jest).
+The capability to test REST APIs which needs the client to be authenticated/authorized is a
+challenge that is handled by 8 of the tools. Another supported feature is clearing the database after
+each test run which resets the database state. This feature is of great importance, as each test case
+has to be independent from each other. This feature is only supported by EvoMaster. EvoMaster
+is also the only tool which supports Automated Code Instrumentation as it conducts white-box testing
+and needs to insert probes into the source code of the SUT to collect code coverage during test case
+generation.
+The features we detected are not only limited to Table 9. For example, installers for different
+operating systems are available for EvoMaster. As another example, RESTest enables user to
+modify operations under test. In other words, it is allowed to exclude some endpoints from being
+tested.
+Table 9: Features which have been supported by open-source research prototypes
+
+Item
+
+#
+
+Tool(s)
+
+Input
+OpenAPI
+I/O Traces
+API Call
+Path dependencies
+JSON schema
+1
+1
+
+RestTestGen, RESTApiTester, EvoMaster, bBOXRT, RESTest,
+Restler, Api Tester, Restats, Gadolinium, RestCT, Hsuan-Fuzz,
+Schemathesis
+Restats, ExVivoMicroTest
+DeepLearningBasedTool
+Hsuan-Fuzz
+Jsongen
+
+Output
+JUnit test case
+Unspecified test case
+Python test case
+xUnit test case
+Jest test case
+Validity of API call
+Test coverage metrics
+Test coverage level
+OpenAPI
+Visualized data (charts)
+Test results (statistics.csv and Swagger)
+QuickCheck generator
+4
+1
+1
+1
+1
+1
+
+RestTestGen, EvoMaster, RESTest, Api Tester
+RESTApiTester, bBOXRT, Restler, Hsuan-Fuzz
+Schemathesis, ExVivoMicroTest
+EvoMaster
+EvoMaster
+DeepLearningBasedTool
+Restats
+Restats
+Gadolinium
+Gadolinium
+RestCT
+Jsongen
+RestTestGen, EvoMaster, RESTest, Restler, Api Tester, HsuanFuzz, Instance Identification, Jsongen
+EvoMaster
+EvoMaster
+
+Authentication Support
+
+Database Reset Support
+Automated Code Instrumentation
+
+RQ10: There are a variety of features supported by the released prototypes.We listed them based on
+five categories. OpenAPI schema as inputs and JUnit test cases as outputs have been the most
+common ones.
+Research Challenges
+
+In this section, we discuss challenges presented in existing studies of REST API testing. These could
+be addressed challenges that have been posed by the research questions in the papers (RQ11), or issues
+that are still open for future work (RQ12).
+
+8.1
+
+RQ11: Which research challenges are addressed?
+
+We studied the papers to infer the main challenge(s) they have addressed. Then, we wrote them down,
+grouped them and searched for the most common ones, which appear in at least more than one article.
+Most articles deal with presenting a novel technique (usually a fuzzer) aiming at fault finding. Here,
+however, we rather discuss work that focuses on specific identified challenges of testing REST APIs,
+and not their testing in general. This can provide a better understanding of different specific aspects
+of testing REST APIs.
+In Table 10, we have included the research challenges which have been addressed by at least one
+paper. Handling resource dependency was the most repeated research challenge among the analyzed
+Table 10: Common research challenges addressed by the papers
+Challenge
+
+#
+
+Papers
+
+Handling resource dependencies
+Inferring inter-parameter dependencies
+Oracle problem
+Handling database
+White-box heuristics
+Mocking
+Defining coverage criteria
+Instance identification
+6
+3
+2
+2
+
+[170, 146, 59, 169, 76, 158, 110, 113]
+[160, 120, 122, 79, 125, 123]
+[60, 141, 63, 117, 114]
+[53, 166, 52]
+[55, 54, 168]
+[69, 143]
+[124, 81]
+[152, 153]
+
+articles, focused on in 8 articles. This challenge refers to dependencies among resources as they typically
+exist in the SUTs, and dependency identification is used to detect such dependencies based on REST
+API Schema, Accessed SQL Tables and Fitness Feedback [170]. For example, Stallenberg et al. [146]
+have formed a model which captures, replicates and preserves dependency patterns of API calls in new
+test cases as breaking them could impede the effectiveness of the test case generation process.
+Inferring inter-parameter dependencies was the second most frequent addressed challenge (examined
+in 6 articles). It refers to the restrictions that web services frequently impose on how two or more
+input parameters can be combined to create valid calls to the service. It is frequent that the use of one
+parameter necessitates or impedes the use of another parameter or set of parameters. For example,
+[122] has introduced a domain-specific language for the formal specification of dependencies, called
+Inter-parameter Dependency Language (IDL), and a tool suite for the automated analysis of IDL.
+Another common challenge is Oracle problem. Fuzzers can identify faults based on 500 HTTP
+status code, and mismatches of the responses with the given API schema. Research has been carried
+out to define further automated oracles to be able to detect more faults. This could be based on
+security rules (e.g., [60, 63]), or metamorphic relations. When a test execution’s expected outcome
+is complex or unclear, metamorphic testing offers a solution that solves the oracle problem [78, 140].
+Instead of examining the results of a single program execution, metamorphic testing examines whether
+many instances of the program being tested satisfy particular requirements known as metamorphic
+relations. For example, take into account the following metamorphic relation in Spotify: regardless of
+the size of the pagination, two searches for albums with the same query should return the same number
+of total results [141].
+The rest of challenges shown in Table 10 are less common, as they were addressed by two-three
+articles each. Handling Databases is a challenge which was addressed as it has proven that taking
+database’s state into account when generating tests will result in higher code coverage and finding new
+faults [53, 52].
+White-box heuristics aim at improving code coverage results. For example, a common issue in
+SBST is the flag problem [64], where the branch distance is not able to provide any gradient. To solve
+this problem, one method is to use so-called Testability Transformations to change the SUT’s source
+code in a way that enhances the fitness function [99]. These techniques can be used also to derive
+specific information for REST APIs, for example detecting the use of query parameters not specified in
+the OpenAPI schema. The papers which have addressed this issue such as [55, 54] transform the code
+of SUT to improve the fitness function during the search.
+Mocking is another addressed challenge by two of the papers [69, 143] which is aimed at providing
+reliable response for the services that might not be accessible or down temporarily. Instance Identification is a problem in the context of micro-service testing that software testers face as they might
+not know which concrete instance of service is being invoked. Vassiliou-Gioles has suggested adding a
+micro-service instance identification (IID) header field to HTTP requests and responses in order to
+make them more testable [152, 153].
+How to measure the effectiveness of black-box test generators is a challenge addressed in [124, 81],
+where new black-box criteria besides counting detected faults have been defined (i.e., Defining coverage
+criteria). This is particularly important when testing remote APIs for which code coverage metrics
+cannot be used.
+RQ11: The most common addressed challenges include handling resource and inter-parameter
+dependencies, as well as defining new automated oracles.
+
+8.2
+
+RQ12: Which open research challenges are identified?
+Table 11: Common Open Challenges
+
+Challenge
+
+#
+
+Papers
+
+Tool support
+Having more REST case-studies
+Security testing
+Resource handling
+Classifying test results
+Handling external services
+White-box heuristics
+Database handling
+Automated oracles
+Performance testing
+Non-functional testing
+Load testing
+Metamorphic testing
+Underspecified schemas
+10
+4
+4
+4
+2
+1
+[62, 108, 80, 126, 151, 154, 50, 124, 86, 107, 150, 73, 106, 137, 149,
+79, 65, 115, 159, 101, 47, 130, 125, 123, 168]
+[170, 121, 129, 60, 154, 59, 124, 169, 165, 166, 71, 112, 114]
+[82, 154, 59, 104, 89, 107, 149, 65, 101, 95]
+[170, 169, 106, 166]
+[108, 51, 80, 149]
+[51, 167, 79, 47]
+[121, 55, 54, 47]
+[50, 53, 52, 47]
+[67, 155, 61, 156]
+[89, 115, 144]
+[126, 125]
+[62]
+[126]
+[167]
+
+Most of the papers we studied have mentioned some left objectives, to be addressed in future work.
+Among the selected papers, there were 73 papers which have explicitly mentioned at least one open
+challenge for future work. This is usually stated in the Conclusion section of these articles, or in
+specific Future Work section. We collected all of these objectives, and identified the most common
+challenges among them, as shown in Table 11. Note that, in most cases, a typical challenge is to design
+better techniques to obtain better code coverage and fault finding results. Here, we rather focus on
+more specific challenges related to testing RESTful APIs.
+Based on Table 11, the most common objective left as future work is Tool support that is mentioned
+in 25 papers. Research in this domain is based on tool prototypes. Due to the complexity of handling
+RESTful APIs, these tools require major engineering effort. An early prototype can provide the base
+to experiments with some research ideas, which can already be of use and be publishable. Work is then
+left to improve these tools to be able to be applicable on more case studies, and to be more user-friendly
+for practitioners. For example, in [86] the authors proposed an approach that supports OpenAPI v2,
+and plan to enabling its support for OpenAPI v3 as well. Another example, supporting authentication
+is needed to enable testing endpoints which needs the client to be authenticated, which was specified
+as needed future work in [154]. In these cases, not all techniques presented in the literature support
+authentication, or the full specs of the OpenAPI standard. Still, even with partial support, it is possible
+to provide and evaluate novel techniques.
+Being mentioned in 13 papers, Having more REST case-studies to apply the new approach to a
+higher number of REST APIs for empirical evaluation was the second most frequent open challenge.
+This is a general issue related to Threats to External Validity, which applies to most empirical studies
+in the software engineering research literature. However, one peculiarity here is on the kind of systems
+used for experimentation. On the one hand, APIs on the internet pose few issues, including difficulty
+in replicating studies (APIs can change at any time) and inability to collect code coverage metrics. On
+the other hand, running APIs on local machines for experimentation has non trivial setup costs, for
+example on how to setup databases and user info authentication. It can take a significant amount of
+time to find and setup a large number of REST APIs for experimentation. Furthermore, experiments
+on system test generation for Web APIs are time consuming, as each test case evaluation requires
+to execute HTTP calls over a network. Given a fixed amount of time to run experiment (e.g., a
+machine with experiments left running for a week), this reduces the number of APIs that can be used
+for experimentation.
+Many of the articles discussed in this paper present a new approach for generating test cases that
+can find faults, based on functional properties (e.g., API should not return a 500 HTTP status code,
+or a response not matching the constraints of the schema). A common line of future work mentioned
+in these articles is to extend such work to consider other types of testing, in particular Security testing
+(10 papers), as well as others such as Performance testing and Load testing (and other unspecified
+Non-functional testing).
+The other types of open challenges are mentioned less often, in up to 4 articles. For example, there
+are specific properties of REST APIs (e.g., the idempotency of HTTP verbs) that could be used as
+Automated oracles to be able to find more faults. Related, it will also be important to properly analyze
+the test results (i.e., Classifying test results) to be able to automatically check if the obtained responses
+represent actual faults, and classify their importance/criticality.
+Regarding Handling external services, it is possible for a RESTful API to rely on communications
+with other RESTful APIs. Whether the testing mode is either black box or white box, dealing with
+external services makes testing these APIs very difficult. In the black box mode, there would be no
+control of the external services. Interactions with these external services would be based on both their
+implementation and current status. As a result, the chance of being flaky increases. Handling external
+services is a challenge in white-box mode as well. Even if a developer had complete control over all of
+those services, it might be difficult to set up and run numerous separate web services (each of which
+can utilize its own database) for usage by the SUT during testing.
+Another issue is when dealing with Database handling. Databases are very common in RESTful
+APIs, and the interactions of the APIs with these databases do impact the level of code coverage
+and fault finding the fuzzers can reach. Some basic techniques have been presented to handle SQL
+databases, but more needs to be done, especially to handle other kinds of databases, like NoSQL
+databases such as MongoDB.
+When the content of databases cannot be analyzed (e.g., in black-box testing), it is important
+to detect relations between operations, such as the need to create a resource with a POST request
+first before being able to test its GET endpoint. Several articles have addressed this issue (e.g., recall
+Section 8.1). Still, a major issue regarding Resource handling is how to deal with schemas that do not
+follow the guidelines of REST (e.g., resources not structured hierarchically), as it is much harder there
+to infer resource relations among the different endpoints.
+Based on our review, only one tool supports automated white-box testing of RESTful APIs (i.e.,
+EvoMaster). As the achieved code coverage still needs to be improved, several code-level issues have
+been identified and categorized, which will need to be addressed to achieve higher code coverage, e.g.,
+with new White-box heuristics. One possible venue where white-box heuristics can be useful is to deal
+with Underspecified schemas, i.e., when there are constraints on the data and operations of the API,
+but those are not specified in the schema.
+RQ12: We have identified a variety of open challenges discussed in the analyzed articles. There is
+still a lot of research work that is needed to be carried out in this domain.
+Threats to Validity
+
+As for any survey, there is the validity threat that some important and relevant articles have been
+missed from our analysis. We used the most popular search databases to find all relevant articles. As
+the results reply on search engine provide by each database and some relevant paper might not be
+published in the selected databases, we additionally performed a forward and backward snowballing
+procedure to find any other missing articles. In addition, paper selection was done manually, then
+human mistakes are possible. To reduce such a risk, three authors were involved in the procedures in
+order to reach a final agreement by all, e.g., only papers that all of us the three authors agreed on to
+exclude were excluded. However, there is always the possibility that other researchers might have
+come to some different selections.
+Extracting data from the articles required manual effort and expertise, and it might be prone to
+human mistakes. To reduce such validity threat, each selected paper was checked by at least two of us
+authors. We are the authors of 16 articles out of the 92 in our survey. Although we are confident
+that we were able to properly analyze our own work, there is always the risk that we might have
+misunderstood the text of some articles written by other researchers.
+Conclusion
+
+In this survey, we have collected and analyzed 92 articles on the topic of testing RESTful APIs. For
+this analysis, we can see that there has been an exponential increase in interest on this topic in the
+research community, starting from 2017 (Section 5). Many different techniques have been evaluated,
+including both black-box and white-box techniques (Section 6). Furthermore, besides scientific articles,
+several prototypes have been released as open-source projects, with empirical investigation carried out
+on many real-word APIs, finding real faults in them. This shows potential usefulness of this line of
+research for practitioners in industry (Section 7). Different scientific challenges have been addressed,
+while others still need to be solved (Section 8).
+RESTful APIs are widely used in industry. Research work on this topic has strong potential to
+have significant impact on industrial practice.
+This survey provides a detailed snapshot of the current state-of-the-art in the research literature
+on testing RESTful APIs. This is a growing field, where this survey can provide a useful starting point
+to drive new research directions on this important topic.
+
+Acknowledgments
+This work is funded by the European Research Council (ERC) under the European Union’s Horizon
+2020 research and innovation programme (EAST project, grant agreement No. 864972).

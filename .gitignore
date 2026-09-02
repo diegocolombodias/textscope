@@ -9,5 +9,9 @@ venv/
 models/
 reference.json
 
+# Downloaded source PDFs for the reference corpus (large binaries; the
+# extracted .txt files under reference_corpus/txt/ are tracked instead)
+reference_corpus/pdf/
+
 # Original zip (source already extracted and tracked)
 textscope.zip

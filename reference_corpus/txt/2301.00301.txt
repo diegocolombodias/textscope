@@ -1,0 +1,1808 @@
+Generalized PTR: User-Friendly Recipes for Data-Adaptive
+Algorithms with Differential Privacy
+
+Rachel Redberg, Yuqing Zhu, Yu-Xiang Wang
+University of California, Santa Barbara
+{rredberg, yuqingzhu, yuxiangw}@ucsb.edu
+January 3, 2023
+Abstract
+The “Propose-Test-Release” (PTR) framework [Dwork and Lei, 2009] is a classic recipe for
+designing differentially private (DP) algorithms that are data-adaptive, i.e. those that add less
+noise when the input dataset is “nice”. We extend PTR to a more general setting by privately
+testing data-dependent privacy losses rather than local sensitivity, hence making it applicable
+beyond the standard noise-adding mechanisms, e.g. to queries with unbounded or undefined
+sensitivity. We demonstrate the versatility of generalized PTR using private linear regression
+as a case study. Additionally, we apply our algorithm to solve an open problem from “Private
+Aggregation of Teacher Ensembles (PATE)” [Papernot et al., 2017, 2018] — privately releasing
+the entire model with a delicate data-dependent analysis.
+Introduction
+
+The guarantees of differential privacy (DP) [Dwork et al., 2006] are based on worst-case outcomes
+across all possible datasets. A common paradigm is therefore to add noise scaled by the global
+sensitivity of a query f , i.e. the maximum change in f between any pair of neighboring datasets.
+A given dataset X might have a local sensitivity that is much smaller than the global sensitivity, in
+which case we can hope to add a smaller amount of noise (calibrated to the local rather than the
+global sensitivity) while achieving the same privacy guarantee. However, this must not be undertaken
+naïvely – the local sensitivity is a dataset-dependent function and so calibrating noise to the local
+sensitivity could leak information about the dataset [Nissim et al., 2007].
+The “Propose-Test-Release” (PTR) framework [Dwork and Lei, 2009] resolves this issue by introducing
+a test to privately check whether a proposed bound on the local sensitivity is valid. Only if the
+test “passes” is the output released with noise calibrated to the proposed bound on the local
+sensitivity.
+PTR is a powerful and flexible tool for designing data-adaptive DP algorithms, but it has several
+limitations. First, it applies only to noise-adding mechanisms which calibrate noise according to the
+sensitivity of a query. Second, the test in “Propose-Test-Release” is computationally expensive for all
+but a few simple queries such as privately releasing the median or mode. Third, while some existing
+works [Decarolis et al., 2020, Kasiviswanathan et al., 2013, Liu et al., 2021] follow the approach of
+testing “nice” properties of a dataset before exploiting these properties in a private release to PTR 1 ,
+We refer to these as PTR-like methods.
+there has not been a systematic recipe for discovering which properties should be tested.
+In this paper, we propose a generalization of PTR which addresses these limitations. The centerpiece
+of our framework is a differentially private test on the data-dependent privacy loss. This test does
+not directly consider the local sensitivity of a query and is therefore not limited to additive noise
+mechanisms. Moreover, in many cases, the test can be efficiently implemented by privately releasing
+a high-probability upper bound, thus avoiding the need to search an exponentially large space of
+datasets. Furthermore, the derivation of the test itself often spells out exactly what properties of the
+input dataset need to be checked, which streamlines the design of data-adaptive DP algorithms.
+Our contributions are summarized as follows:
+1. We propose a generalization of PTR which can handle algorithms beyond noise-adding
+mechanisms. Generalized PTR allows us to plug in any data-dependent DP analysis to
+construct a high-probability DP test that adapts to favorable properties of the input dataset –
+without painstakingly designing each test from scratch.
+2. We demonstrate that many existing examples of PTR and PTR-like algorithms can be unified
+under the generalized PTR framework, sometimes resulting in a tighter analysis (see an
+example of report-noisy-max in Sec A.1).
+3. We show that one can publish a DP model through privately upper-bounding a one-dimensional
+statistic — no matter how complex the output space of the mechanism is. We apply this result
+to solve an open problem from PATE [Papernot et al., 2017, 2018].
+4. Our results broaden the applicability of private hyper-parameter tuning [Liu and Talwar, 2019,
+Papernot and Steinke, 2021] in enabling joint-parameter selection of DP-specific parameters
+(e.g., noise level) and native parameters of the algorithm (e.g., learning rate, regularization
+weight), which may jointly affect the data-dependent DP losses.
+Related Work
+
+Data-dependent DP algorithms. Privately calibrating noise to the local sensitivity is a wellstudied problem. One approach is to add noise calibrated to the smooth sensitivity [Nissim et al.,
+2007], an upper bound on the local sensitivity which changes slowly between neighboring datasets.
+An alternative to this – and the focus of our work – is Propose-Test-Release (PTR) [Dwork and
+Lei, 2009], which works by calculating the distance Dβ (X) to the nearest dataset to X whose local
+sensitivity violates a proposed bound β. The PTR algorithm then adds noise to Dβ (X) before
+testing whether this privately computed distance is sufficiently large.
+PTR spin-offs abound. Notable examples include stability-based methods [Thakurta and Smith,
+2013] (stable local sensitivity of 0 near the input data) and privately releasing upper bounds of local
+sensitivity [Kasiviswanathan et al., 2013, Liu et al., 2021, Decarolis et al., 2020]. We refer readers to
+Chapter 3 of Vadhan [2017] for a concise summary of these classical results. Recent work [Wang
+et al., 2022] has provided Rényi DP bounds for PTR and demonstrated its applications to robust
+DP-SGD. Our work (see Section 5.2) also considers applications of PTR in data-adaptive private
+deep learning: Instead of testing the local sensitivity of each gradient step as in Wang et al. [2022],
+our PTR-based PATE algorithm tests the data-dependent privacy loss as a whole.
+Liu et al. [2021] proposed a new variant called High-dimensional Propose-Test-Release (HPTR). HPTR
+provides a systematic way of solving DP statistical estimation problems by using the exponential
+mechanism (EM) with carefully constructed scores based on certain one-dimensional robust statistics,
+which have stable local sensitivity bounds. HPTR focuses on designing data-adaptive DP mechanisms
+from scratch; our method, in contrast, converts existing randomized algorithms (including EM and
+even some that do not satisfy DP) into those with formal DP guarantees. Interestingly, our proposed
+method also depends on a one-dimensional statistic of direct interest: the data-dependent privacy
+loss.
+Data-dependent DP losses. The flip side of data-dependent DP algorithms is the study of
+data-dependent DP losses [Papernot et al., 2018, Soria-Comas et al., 2017, Wang, 2017], which fix
+the randomized algorithm but parameterize the resulting privacy loss by the specific input dataset.
+For example: In the simple mechanism that adds Laplace noise with parameter b, data-dependent
+DP losses are (X) = ∆LS (X)/b. The data-dependent DP losses are often much smaller than the DP
+loss, but they themselves depend on the data and thus may reveal sensitive information; algorithms
+satisfying a data-dependent privacy guarantee are not formally DP with guarantees any smaller
+than that of the worst-case. Existing work has considered privately publishing these data-dependent
+privacy losses [Papernot et al., 2018, Redberg and Wang, 2021], but notice that privately publishing
+these losses does not improve the DP parameter of the given algorithm. Part of our contribution is
+to resolve this conundrum by showing that a simple post-processing step of the privately released
+upper bound of (Data) gives a formal DP algorithm.
+Private hyper-parameter tuning. Our work has a nice connection with private hyper-parameter
+tuning. Prior work [Liu and Talwar, 2019, Papernot and Steinke, 2021] requires each candidate
+configuration to be released with the same DP (or Rényi DP) parameter set. Another hidden
+assumption is that the parameters must not be privacy-correlated (i.e., parameter choice will not
+change the privacy guarantee). Otherwise we need to use the largest DP bound across all candidates.
+For example, Liu and Talwar [2019] show that if each mechanism (instantiated with one group of
+hyper-parameters) is (, 0)-DP, then running a random number of mechanisms and reporting the best
+option satisfies (3, 0)-DP. Our work directly generalizes the above results by (1) considering a wide
+range of hyper-parameters, either privacy-correlated or not; and (2) requiring only that individual
+candidates to have a testable data-dependent DP.
+Preliminaries
+
+Datasets X, X 0 ∈ X are neighbors if they differ by no more than one datapoint – i.e., X ≃ X 0 if
+d(X, X 0 ) ≤ 1. We will define d(·) to be the number of coordinates that differ between two datasets
+of the same size n: d(X, Y ) = #{i ∈ [n] : Xi 6= Yi }.
+We use || · || to denote the radius of the smallest Euclidean ball that contains the input set, e.g.
+||X || = supx∈X ||x||.
+The parameter φ denotes the privacy parameters associated with a mechanism (e.g. noise level,
+regularization). Mφ is a mechanism parameterized by φ. For mechanisms with continuous output
+space, we will take Pr[M(X) = y] to be the probability density function of M(X) at y.
+Definition 3.1 (Differential privacy [Dwork et al., 2006]). Fix , δ ≥ 0. A randomized algorithm
+M : X → S satisfies (, δ)-DP if for all neighboring datasets X ≃ X 0 and for all measurable sets
+S ⊂ S,
+
+
+
+
+Pr M(X) ∈ S ≤ e Pr M(X 0 ) ∈ S + δ.
+Suppose we wish to privately release the output of a real-valued function f : X → R. We can do so
+by calculating the global sensitivity ∆GS , calibrating the noise scale to the global sensitivity and
+then adding sampled noise to the output.
+Definition 3.2 (Local / Global sensitivity). The local `∗ -sensitivity of a function f is defined as
+∆LS (X) = max0 ||f (X) − f (X 0 )||∗ and the global sensitivity of f is ∆GS = supX ∆LS (X).
+X≃X
+
+3.1
+
+Propose-Test-Release
+
+Calibrating the noise level to the local sensitivity ∆LS (X) of a function would allow us to add less
+noise and therefore achieve higher utility for releasing private queries. However, the local sensitivity
+is a data-dependent function and naïvely calibrating the noise level to ∆LS (X) will not satisfy
+DP.
+PTR resolves this issue in a three-step procedure: propose a bound on the local sensitivity, privately
+test that the bound is valid (with high probability), and if so calibrate noise according to the bound
+and release the output.
+PTR privately computes the distance Dβ (X) between the input dataset X and the nearest dataset
+X 00 whose local sensitivity exceeds the proposed bound β:
+Dβ (X) = min
+{d(X, X 00 ) : ∆LS (X 00 ) > β}.
+X
+
+Algorithm 1 Propose-Test-Release [Dwork and Lei, 2009]
+Dataset X; privacy parameters , δ; proposed bound β on ∆LS (X); query function
+f : X → R.
+ log(1/δ)
+2: if Dβ (X) + Lap 1 ≤
+   then output ⊥,
+1: Input:
+
+3: else release f (X) + Lap
+
+β
+
+
+.
+
+Theorem 3.3. Algorithm 1 satisfies (2, δ)-DP. [Dwork and Lei, 2009]
+Rather than proposing an arbitrary threshold β, one can also privately release an upper bound of
+the local sensitivity and calibrate noise according to this upper bound. This was used for node DP
+in graph statistics [Kasiviswanathan et al., 2013], and for fitting topic models using spectral methods
+[Decarolis et al., 2020].
+Generalized PTR
+
+This section introduces the generalized PTR framework. We first formalize the notion of datadependent differential privacy that conditions on an input dataset X.
+Definition 4.1 (Data-dependent privacy). Suppose we have δ > 0 and a function  : X → R. We
+say that mechanism M satisfies ((X), δ) data-dependent DP2 for dataset X if for all possible output
+sets S and neighboring datasets X 0 ,
+
+
+
+
+Pr M(X) ∈ S ≤ e(X) Pr M(X 0 ) ∈ S + δ,
+
+
+
+
+Pr M(X 0 ) ∈ S ≤ e(X) Pr M(X) ∈ S + δ.
+We will sometimes write that M(X) satisfies (X) data-dependent DP with respect to δ.
+In generalized PTR, we propose a value φ for the randomized algorithm M, which could be a noise
+scale or regularization parameter – or a set including both. For example, φ = (λ, γ) in Example 4.4.
+We then say that Mφ is the mechanism M parameterized by φ, and φ (X) its data-dependent
+DP.
+The following example illustrates how to derive the data-dependent DP for a familiar friend – the
+Laplace mechanism.
+Example 4.2. ( Data-dependent DP of Laplace Mechanism.) Given a function f : X → R, we will
+define
+Mφ (X) = f (X) + Lap (φ) .
+We then have
+log
+
+Pr[Mφ (X) = y]
+|f (X) − f (X 0 )|
+≤
+.
+Pr[Mφ (X 0 ) = y]
+φ
+
+Maximizing the above calculation over all possible outputs y and using Definition 4.1,
+φ (X) =
+
+∆LS (X)
+|f (X) − f (X 0 )|
+=
+.
+X :X ≃X
+φ
+φ
+max
+0
+
+The data-dependent DP φ (X) is a function of both the dataset X and the parameter φ. Maximizing
+φ (X) over X recovers the standard DP guarantee of running M with parameter φ.
+Algorithm 2 Generalized Propose-Test-Release
+1: Input: Dataset X; mechanism Mφ : X → R and its privacy budget , δ; (ˆ
+, δ̂)-DP test T ; false
+
+positive rate ≤ δ 0 ; data-dependent DP function φ (·) w.r.t. δ.
+2: if not T (X ) then output ⊥,
+3: else release θ = Mφ (X).
+
+Theorem 4.3 (Privacy guarantee of generalized PTR). Consider a proposal φ and a data-dependent
+DP function φ (X) w.r.t. δ. Suppose that we have an (ˆ
+, δ̂)-DP test T : X → {0, 1} such that when
+φ (X) > ,
+(
+0 with probability 1 − δ 0 ,
+T (X) =
+1 with probability δ 0 .
+Then Algorithm 2 satisfies ( + ˆ, δ + δ̂ + δ 0 )-DP.
+Proof sketch. There are three main cases to consider:
+1. We decide not to run Mφ .
+2. We decide to run Mφ and φ (X) > ;
+3. We decide to run Mφ and φ (X) ≤ .
+In the first case, the decision to output ⊥ is post-processing of an (ˆ
+, δ̂)-DP mechanism and inherits
+its privacy guarantees. The second case occurs when the (ˆ
+, δ̂)-DP test "fails" (produces a false
+positive) and occurs with probability at most δ 0 . The third case is a composition of an (ˆ
+, δ̂)-DP
+algorithm and an (, δ)-DP algorithm.
+Generalized PTR is a strict generalization of Propose-Test-Release. For some function f , define Mφ
+and T as follows:
+Mφ (X) = f (X) + Lap(φ);
+(
+0 if Dβ (X) + Lap
+T (X) =
+1 otherwise.
+
+
+
+
+> log(1/δ)
+,
+
+
+Notice that our choice of parameterization is φ = β , where φ is the scale of the Laplace noise. In
+other words, we know from Example 4.2 that φ (X) >  exactly when ∆LS (X) > β.
+For noise-adding mechanisms such as the Laplace mechanism, the sensitivity is proportional to the
+privacy loss (in both the global and local sense, i.e. ∆GS ∝  and ∆LS ∝ (X)). Therefore for these
+mechanisms the only difference between privately testing the local sensitivity (Algorithm 1) and
+privately testing the data-dependent DP (Theorem 4.3) is a change of parameterization.
+
+4.1
+
+Limitations of local sensitivity
+
+Why do we want to generalize PTR beyond noise-adding mechanisms? Compared to classic PTR, the
+generalized PTR framework allows us to be more flexible in both the type of test conducted and also
+the type of mechanism whose output we wish to release. For many mechanisms, the local sensitivity
+either does not exist or is only defined for specific data-dependent quantities (e.g., the sensitivity of
+the score function in the exponential mechanism) rather than the mechanism’s output.
+The following example illustrates this issue.
+Example 4.4 (Private posterior sampling). Let M : X × Y → Θ be a private posterior sampling
+mechanism [Minami et al., 2016, Wang et al., 2015, Gopi et al., 2022] for approximately minimizing
+FX (θ).
+M samples θ ∼ P (θ) ∝ e−γ(FX (θ)+0.5λ||θ|| ) with parameters γ, λ. Note that γ, λ cannot be appropriately chosen for this mechanism to satisfy DP without going through a sensitivity calculation of
+arg min FX (θ). In fact, the global and local sensitivity of the minimizer is unbounded even in linear
+regression problems, i.e when FX (θ) = 21 ||y − Xθ||2 .
+Output perturbation algorithms do work for the above problem when we regularize, but they
+are known to be suboptimal in theory and in practice [Chaudhuri et al., 2011]. In Section 5.1
+we demonstrate how to apply generalized PTR to achieve a data-adaptive posterior sampling
+mechanism.
+Even in the cases of noise-adding mechanisms where PTR seems to be applicable, it does not lead to
+a tight privacy guarantee. Specifically, by an example of privacy amplification by post-processing
+(Example A.1 in the appendix), we demonstrate that the local sensitivity does not capture all
+sufficient statistics for data-dependent privacy analysis and thus is loose.
+4.2
+
+Which φ to propose
+
+The main limitation of generalized PTR is that one needs to “propose” a good guess of parameter φ.
+Take the example of φ being the noise level in a noise-adding mechanism. Choosing too small a φ
+will result in a useless output ⊥, while choosing too large a φ will add more noise than necessary.
+Finding this ’Goldilocks’ φ might require trying out many different possibilities – each of which will
+consume privacy budget.
+This section introduces a method to jointly tune privacy parameters (e.g., noise scale) along with
+parameters related only to the utility of an algorithm (e.g., learning rate or batch size in stochastic
+gradient descent) – while avoiding the ⊥ output.
+Algorithm 3 takes a list of parameters as input, runs generalized PTR with each of the parameters,
+and returns the output with the best utility. We show that the privacy guarantee with respect to 
+is independent of the number of φ that we try.
+Formally, let φ1 , ..., φk be a set of hyper-parameters and θ̃i ∈ {⊥, Range(M)} denotes the output of
+running generalized PTR on a private dataset X with φi . Let Xval be a public validation set and
+q(θ̃i ) be the score of evaluating θ̃i with Xval (e.g., validation accuracy). The goal is to select a pair
+(θ̃i , φi ) such that DP model θ̃i maximizes the validation score.
+The generalized PTR framework with privacy calibration is described in Algorithm 3. The privacy
+guarantee of Algorithm 3 is an application of Liu and Talwar [2019].
+Algorithm 3 PTR with hyper-parameter selection
+1: Input: Privacy budget per PTR algorithm (∗ , δ ∗ ), cut-off T , parameters φ1:k , flipping probability
+
+τ and validation score function q(·).
+2: Initialize the set S = ∅.
+3: Draw G from a geometric distribution Dτ and let T̂ = min(T, G).
+4: for i = 1 ,..., T̂ do
+5:
+pick a random φi from φ1:k .
+6:
+evaluate φi : (θ̃i , q(θ̃i )) ← Algorithm 2(φi , (∗ , δ ∗ )).
+7:
+S ← S ∪ {θ̃i , q(θ̃i )}.
+8: end for
+9: Output the highest scored candidate from S.
+
+Theorem 4.5 ( Theorem 3.4 Liu and Talwar [2019] ). Fix any τ ∈ [0, 1], δ2 > 0 and let T = τ1 log δ12 .
+√
+√
+If each oracle access to Algorithm 2 is (∗ , δ ∗ )-DP, then Algorithm 3 is (3∗ + 3 2δ ∗ , 2δ ∗ T + δ2 )-DP.
+The theorem implies that one can try a random number of φ while paying a constant . In practice,
+we can roughly set τ = 10k
+so that the algorithm is likely to test all k parameters. We emphasize
+that the privacy and the utility guarantee (stated in the appendix) is not our contribution. But the
+idea of applying generalized PTR to enforce a uniform DP guarantee over all choices of parameters
+with a data-dependent analysis is new, and in our opinion, significantly broadens the applicability to
+generic hyper-parameter tuning machinery from Liu and Talwar [2019].
+
+4.3
+
+Construction of the DP test
+
+Classic PTR uses the Laplace mechanism to construct a differentially private upper bound of Dβ (X),
+the distance from input dataset X to the closest dataset whose local sensitivity exceeds the proposed
+bound β. The tail bound of the Laplace distribution then ensures that if Dβ (X) = 0 (i.e. if
+∆LS (X) > β), then the output will be released with only a small probability δ.
+The following theorem shows that we could instead use a differentially private upper bound of the
+data-dependent DP φ (X) in order to test whether to run the mechanism Mφ .
+Theorem 4.6 (Generalized PTR with private upper bound). Suppose we have a differentially private
+upper bound of φ (X) w.r.t. δ such that with probability at least 1 − δ 0 , Pφ (X) > φ (X). Further
+suppose we have an (ˆ
+, δ̂)-DP test T such that
+(
+1 if Pφ (X) < ,
+T (X) =
+0 otherwise.
+Then Algorithm 2 is ( + ˆ, δ + δ̂ + δ 0 )-DP.
+In Section 5.2, we demonstrate that one can upper bound the data-dependent DP through a
+modification of the smooth sensitivity framework applied on φ (X). Moreover, in Section 5.1 we
+provide a direct application of Theorem 4.6 with private linear regression by making use of the
+per-instance DP technique [Wang, 2017].
+The applications in Section 5 are illustrative of two distinct approaches to constructing the DP test
+for generalized PTR:
+1. Private sufficient statistics release (used in the private linear regression example of Section 5.1)
+specifies the data-dependent DP as a function of the dataset and privately releases each
+data-dependent component.
+2. The second approach (used in the PATE example of Section 5.2) uses the smooth sensitivity
+framework to privately release the data-dependent DP as a whole, and then construct a
+high-confidence test using the Gaussian mechanism.
+These two approaches cover most of the scenarios arising in data-adaptive analysis. For example,
+in the appendix we demonstrate the merits of generalized PTR in handling data-adaptive private
+generalized linear models (GLMs) using private sufficient statistics release. Moreover, sufficient
+statistics release together with our private hyper-parameter tuning (Algorithm 3) can be used to
+construct data-adaptive extensions of DP-PCA and Sparse-DP-ERM (see details in the future work
+section).
+Applications
+
+In this section, we put into action our approaches to construct the DP test and provide applications
+in private linear regression and PATE.
+
+5.1
+
+Private Linear Regression
+
+Theorem 5.1 ([Wang, 2017]). For input data X ∈ X and Y ∈ Y, define the following:
+• λmin (X) denotes the smallest eigenvalue of X T X;
+• ||θλ∗ || is the magnitude of the solution θλ∗ = (X T X + λI)−1 X T Y ;
+• and L(X, y) := ||X ||(||X ||||θλ∗ || + ||Y||) is the local Lipschitz constant, denoted L in brief.
+UCI Bike dataset (n = 17379, d = 17)
+4 × 10 2
+3 × 10 2
+
+AdaOPS
+non-private
+OutPert
+OPS
+OPS with PTR
+
+6 × 10 2
+
+4 × 10 2
+
+2 × 10 2
+
+MSE
+
+MSE
+
+UCI elevators dataset (n = 8752, d = 18)
+
+AdaOPS
+non-private
+OutPert
+OPS
+OPS with PTR
+
+3 × 10 2
+
+10 2
+2 × 10 2
+
+6 × 10 3
+
+10 1
+10 1
+
+(a) Bike dataset
+(b) Elevators dataset
+
+Figure 1: Differentially private linear regression algorithms on UCI datasets. y-axis reports the MSE
+error with confidence intervals.  is evaluated with δ = 1e − 6.
+For brevity, denote λ∗ = λ + λmin (X). The algorithm used in Example 4.4 with parameter φ = (λ, γ)
+obeys (φ (Z), δ) data-dependent DP for each dataset Z = (X, Y ) with φ (Z) equal to
+r
+γL2 log(2/δ)
+γL2
+1 + log(2/δ)||X ||2
++
++
+.
+λ∗
+2(λ∗ + ||X ||2 )
+2(λ∗ )
+Notice that the data-dependent DP is a function of (λmin , L, ||θλ∗ ||, λ, γ), where (λmin , L, ||θλ∗ ||) are
+data-dependent quantities. One can apply the generalized PTR framework as in the following
+example.
+Example 5.2 (OPS with PTR). We demonstrate here how to apply generalized PTR to the oneposterior sample (OPS) algorithm, a differentially private mechanism which outputs one sample from
+the posterior distribution of a Bayesian model with bounded log-likelihood.
+• Propose φ = (λ, γ).
+• Based on (λ, γ), differentially privately release λmin , ||θλ∗ ||, L with privacy budget (, δ/2).
+• Condition on a high probability event (with probability at least 1 − δ/2) of λmin , ||θλ∗ ||, L, test if
+Pφ (X) is smaller than the predefined privacy budget (ˆ
+, δ̂), where Pφ (X) denotes the sanitized
+data-dependent DP.
+γ
+2
+
+• Based on the outcome of the test, decide whether to release θ ∝ e− 2 ||Y −Xθ|| +λ||θ|| .
+Theorem 5.3. The algorithm outlined in Example 5.2 satisfies ( + ˆ, δ + δ̂)-DP.
+The main idea of the above algorithm boils down to privately releasing all data-dependent quantities
+in data-dependent DP, constructing high-probability confidence intervals of these quantities, and
+then deciding whether to run the mechanism M with the proposed parameters. We defer the details
+of the privacy calibration of data-dependent quantities to the appendix.
+One may ask why we cannot directly tune privacy parameters (λ, γ) based on the sanitized datadependent DP. This is because, in many scenarios, data-dependent quantities depend on the choice of
+privacy parameters, e.g., ||θλ∗ || is a complicated function of λ. Thus, the optimization on λ becomes
+a circular problem — to solve λ, we need to sanitize ||θλ∗ ||, which needs to choose a λ to begin with.
+Alternatively, generalized PTR provides a clear and flexible framework to test the validity of privacy
+parameters adapted to the dataset.
+Remark 5.4. The above “circular” issue is even more serious for generalized linear models (GLMs)
+beyond linear regression. The data-dependent DP there involves a local strong-convexity parameter,
+a complex function of the regularizer λ and we only have zeroth-order access to. In the appendix,
+we demonstrate how to apply generalized PTR to provide a generic solution to a family of private
+GLMs where the link function satisfies a self-concordance assumption.
+We next apply Algorithm 3 for Example 5.2 with UCI regression datasets. Standard z-scoring is
+applied and each data point is normalize with a Euclidean norm of 1. We consider (60%, 10%, 30%)
+splits for training, validation and testing test.
+Baselines
+• Output Perturbation (Outpert) [Chaudhuri et al., 2011]: θ = (X T X + λI)−1 X T y. Release
+θ̂ = θ + b with an appropriate λ, where b is a Gaussian random vector.
+• Posterior sampling (OPS). Sample θ̂ ∼ P (θ) ∝ e−γ(F (θ)+0.5λ||θ|| ) with parameters γ, λ.
+• Adaptive posterior sampling (AdaOPS) [Wang, 2018]. Run OPS with (λ, γ) chosen adaptively
+according to the dataset.
+Outpert and OPS serve as two non-adaptive baselines. In particular, we consider OPS-Balanced [Wang,
+2018], which chooses λ to minimize a data-independent upper bound of empirical risk and dominates
+other OPS variants. AdaOPS is one state-of-the-art algorithm for adaptive private regression, which
+automatically chooses λ by minimizing an upper bound of the data-dependent empirical risk.
+We implement OPS-PTR as follows: propose a list of λ through grid search (we choose k = 30 and λ
+ranges from [2.5, 2.510 ] on a logarithmic scale); instantiate Algorithm 3 with τ = 0.1k, T = τ1 log(1/δ2 )
+and δ2 = 1/2δ; calibrate γ to meet the privacy requirement for each λ. sample θ̂ using (λ, γ) and
+return the one with the best validation accuracy. Notice that we use a “no ⊥” variant of Algorithm 2
+as the calibration of γ is clear given a fixed λ and privacy budget (see more details in the appendix).
+We can propose various combinations of (λ, γ) for more general applications.
+Figure 1 demonstrates how the MSE error of the linear regression algorithms varies with the privacy
+budget . OutPert suffers from the large global sensitivity of output θ. OPS performs well but does
+not benefit from the data-dependent quantities. AdaOPS is able to adaptively choose (λ, γ) based
+on the dataset, but suffers from the estimation error of the data-dependent empirical risk. On the
+other hand, OPS-PTR selects a (λ, γ) pair that minimizes the empirical error on the validation set
+directly, and the privacy parameter γ adapts to the dataset thus achieving the best result.
+
+5.2
+
+PATE
+
+In this section, we apply the generalized PTR framework to solve an open problem from the Private
+Aggregation of Teacher Ensembles (PATE) [Papernot et al., 2017, 2018] — privately publishing the
+entire model through privately releasing data-dependent DP losses. Our algorithm makes use of the
+smooth sensitivity framework [Nissim et al., 2007] and the Gaussian mechanism to construct a highprobability test of the data-dependent DP. The one-dimensional statistical nature of data-dependent
+DP enables efficient computations under the smooth sensitivity framework. Thus, this approach is
+generally applicable for other private data-adaptive analysis beyond PATE.
+PATE is a knowledge transfer framework for model-agnostic private learning. In this framework, an
+ensemble of teacher models is trained on the disjoint private data and uses the teachers’ aggregated
+consensus answers to supervise the training of a “student” model agnostic to the underlying machinelearning algorithms. By publishing only the aggregated answers and by the careful analysis of the
+“consensus”, PATE has become a practical technique in recent private model training.
+The tight privacy guarantee of PATE heavily relies on a delicate data-dependent DP analysis, for
+which the authors of PATE use the smooth sensitivity framework to privately publish the datadependent privacy cost. However, it remains an open problem to show that the released model is DP
+under data-dependent analysis. Our generalized PTR resolves this gap by carefully testing a private
+upper bound of the data-dependent privacy cost. Our algorithm is fully described in Algorithm 4,
+where the modification over the original PATE framework is highlighted in blue.
+Algorithm 4 takes the input of privacy budget (0 , ˆ, δ), unlabeled public data x1:T and K teachers’
+predictions on these data. The parameter  denotes the privacy cost of publishing the data-dependent
+DP and 0 is the predefined privacy budget for testing. nj (xi ) denotes the the number of teachers
+that agree on label j for xi and C denotes the number of classes. The goal is to privately release a
+list of plurality outcomes — argmaxj∈[C] nj (xi ) for i ∈ [T ] — and use these outcomes to supervise
+the training of a “student” model in the public domain. The parameter σ1 denotes the noise scale
+for the vote count.
+In their privacy analysis, Papernot et al. [2018] compute the data-dependent RDPσ1 (α, X) of labeling
+the entire group of student queries. RDPσ1 (α, X) can be orders of magnitude smaller than its dataindependent version if there is a strong agreement among teachers. Note that RDPσ1 (α, X) is a
+function of the RDP order α and the dataset X, analogous to our Definition 4.1 but subject to
+RDP [Mironov, 2017].
+Theorem 5.5 ([Papernot et al., 2018]). If the top three vote counts of xi are n1 > n2 > n3 and
+n1 − n2 , n2 − n3  σ1 , then the data-dependent RDP of releasing argmaxj {nj + N (0, σ12 )} satisfies
+(α, exp{−2α/σ12 }/α)-RDP and the data-independent RDP (using the Gaussian mechanism) satisfies
+(α, σα2 )-RDP.
+Algorithm 4 PATE with generalized PTR
+Unlabeled public data x1:T , aggregated teachers prediction n(·), privacy parameter
+ˆ, 0 , δ, noisy parameter σ1 .
+q
+
+1: Input:
+
+2 log(2/δ)
+0.2
++ 1, σs = σ2 = 3α+2
+ˆ
+ˆ , δ2 = δ/2, smoothness parameter β = α .
+3: Compute noisy labels: yi p ← argmaxj∈[C] {nj (xi ) + N (0, σ12 )} for all i ∈ [1 : T ].
+
+2: Set α =
+
+4: RDPσ1 (α, X) ← data-dependent RDP at the α-th order.
+5: SSβ (X) ← the smooth sensitivity of RDPupper
+(α, X).
+σ1
+
+6: Privately release µ := log(SSβ (X)) + β · N (0, σ22 ) +
+
+p
+2 log(2/δ2 ) · σ2 · β
+upper
+7: RDPσ1 (α) ← an upper bound of data-dependent RDP through Lemma 5.6.
+8: σ1 ← DP guarantee converted from RDPupper
+(α).
+σ1
+p
+9: If 0 ≥ σ1 return a student model trained using (x1:T ; y1:T ).
+10: Else return ⊥.
+However, RDPσ1 (α, X) is data-dependent and thus cannot be revealed. The authors therefore
+privately publish the data-dependent RDP using the smooth sensitivity framework [Nissim et al., 2007].
+The smooth sensitivity calculates a smooth upper bound on the local sensitivity of RDPσ1 (α, X),
+Gaussian mechanism
+PATE-PTR ( + 1)
+data-dependent DP (non-private)
+4
+3
+2
+1
+15
+25
+35
+Noise scale 1
+45
+
+Gaussian mechanism
+PATE-PTR ( + 1)
+data-dependent DP (non-private)
+50
+
+(a) High consensus and strong data-dependent DP
+20
+30
+Noise scale 1
+45
+(b) Low consensus and low data-dependent DP
+
+Figure 2: Privacy and utility tradeoffs with PATE. When σ1 is aligned, three algorithms provide the
+same utility. y-axis plots the privacy cost of labeling T = 200 public data with δ = 10−5 . The left
+figure considers the high-consensus case, where the data-adaptive analysis is preferred.
+denoted as SSβ (X), such that SSβ (X) ≤ eβ SSβ (X 0 ) for any neighboring dataset X and X 0 . By
+adding Gaussian noise scaled by the smooth sensitivity (i.e., release σ1 (α, X) + SSβ (X) · N (0, σs2 )),
+the privacy cost is safely published.
+Unlike most noise-adding mechanisms, the standard deviation σs cannot be published since SSβ (X)
+is a data-dependent quantity. Moreover, this approach fails to provide a valid privacy guarantee
+of the noisy labels obtained through the PATE algorithm, as the published privacy cost could be
+smaller than the real privacy cost. Our solution in Algorithm 4 looks like the following:
+• Privately release an upper bound of the smooth sensitivity SSβ (X) with eµ .
+(α).
+• Conditioned on a high-probability event of eµ , publish the data-dependent RDP with RDPupper
+σ1
+• Convert RDPupper
+(α) back to the standard DP guarantee using RDP to DP conversion at δ/2.
+σ1
+• Test if the converted DP is above the predefined budget 0 .
+The following lemma states that RDPupper
+(α) is a valid upper bound of the data-dependent
+σ1
+RDP.
+Lemma 5.6 (Private upper bound of data-dependent RDP). We are given a RDP function
+RDP(α, X) and a β-smooth sensitivity bound SS(·) of RDP(α, X). Let µ (defined in Algorithm 4)
+denote the private release of log(SSβ (X)). Let the (β, σs , σ2 )-GNSS mechanism be
+RDPupper (α):=RDP(α,X)+SSβ (X)·N (0,σs2 )+σs
+
+q
+2 log( δ2 )eµ
+1
+Then, the release of RDPupper (X) satisfies (α, 3α+2
+)-RDP for all 1 < α < 2β
+; w.p. at least 1 − δ2 ,
+2σs2
+upper
+RDP
+(α) is an upper bound of RDP(α, X).
+
+The proof (deferred to the appendix) makes use of the facts that: (1) the log of SSβ (X) has a
+bounded global sensitivity β through the definition of smooth sensitivity; (2) releasing RDPσ1 (α, X)+
+SSβ (X) · N (0, σs2 ) is (α, α+1
+)-RDP (Theorem 23 from Papernot et al. [2018]).
+σ2
+s
+
+Now, we are ready to state the privacy guarantee of Algorithm 4.
+Theorem 5.7. Algorithm 4 satisfies (0 + ˆ, δ)-DP.
+In the proof, the choice of α ensures that the cost of the δ/2 contribution
+q (used in the RDP-to-DP
+conversion) is roughly ˆ/2. Then the release of RDPupper
+(α) with σs =
+σ1
+cost of (/2, δ/2)-DP.
+
+2+3α
+accounts for another
+ˆ
+
+Empirical results. We next empirically evaluate Algorithm 4 (PATE-PTR) on the MNIST dataset.
+Following the experimental setup from Papernot et al. [2018], we consider the training set to be the
+private domain, and the testing set is used as the public domain. We first partition the training set
+into 400 disjoint sets and 400 teacher models, each trained individually. Then we select T = 200
+unlabeled data from the public domain, with the goal of privately labeling them. To illustrate the
+behaviors of algorithms under various data distributions, we consider two settings of unlabeled
+data, high-consensus and low-consensus. In the low-consensus setting, we choose T unlabeled data
+such that there is no high agreement among teachers, so the advantage of data-adaptive analysis is
+diminished. We provide further details on the distribution of these two settings in the appendix.
+Baselines. We consider the Gaussian mechanism as a data-independent baseline, where the
+privacy guarantee is valid but does not take advantage of the properties of the dataset. The datadependent DP ( Papernot et al. [2018]) serves as a non-private baseline, which requires further
+sanitation. Note that these two baselines provide different privacy analyses of the same algorithm
+(see Theorem 5.5).
+Figure 2 plots privacy-utility tradeoffs between the three approaches by varying the noise scale σ1 .
+The purple region denotes a set of privacy budget choices (ˆ
+ + 0 used in Algorithm 4) such that the
+utility of the three algorithms is aligned under the same σ1 . In more detail, the purple region is
+lower-bounded by ˆ+σ1 . We first fix σs = σ2 = 15 such that ˆ is fixed. Then we empirically calculate
+the average of σ1 (the private upper bound of the data-dependent DP) over 10 trials. Running
+Algorithm 4 with any choice of ˆ + 0 chosen from the purple region implies 0 > σ1 . Therefore,
+PATE-PTR will output the same noisy labels (with high probability) as the two baselines.
+Observation As σ1 increases, the privacy loss of the Gaussian mechanism decreases, while the
+data-dependent DP curve does not change much. This is because the data-dependent DP of each
+query is a complex function of both the noise scale and the data and does not monotonically
+decrease when σ1 increases (see more details in the appendix). However, the data-dependent DP still
+dominates the Gaussian mechanism for a wide range of σ1 . Moreover, PATE-PTR nicely interpolates
+between the data-independent DP guarantee and the non-private data-adaptive DP guarantee. In the
+low-consensus case, the gap between the data-dependent DP and the DP guarantee of the Gaussian
+mechanism unsurprisingly decreases. Meanwhile, PATE-PTR (the purple region) performs well
+when the noise scale is small but deteriorates when the data-independent approach proves more
+advantageous. This example demonstrates that using PTR as a post-processing step to convert
+the data-dependent DP to standard DP is effective when the data-adaptive approach dominates
+others.
+Limitations and Future Work
+
+One weakness of generalized PTR is that it requires a case-specific privacy analysis. Have we simply
+exchanged the problem of designing a data-adaptive DP algorithm with the problem of analyzing
+the data-dependent privacy loss? We argue that this limitation is inherited from classic PTR. In
+situations where classic PTR is not applicable, we’ve outlined several approaches to constructing the
+DP test for our framework (see Sections 4.3 and 5.2).
+Furthermore, the data-dependent privacy loss is often more straightforward to compute than local
+sensitivity, and often exists in intermediate steps of classic DP analysis already. Most DP analysis
+involves providing a high-probability tail bound of the privacy loss random variable. If we stop
+before taking the max over the input dataset, then we get a data-dependent DP loss right away (as
+in Example 4.2).
+There are several exciting directions for applying generalized PTR to more problems. Sufficient
+statistics release and our private hyperparameter tuning (Algorithm 3) can be used to construct
+data-adaptive extensions of DP-PCA [Dwork et al., 2014] and Sparse-DP-ERM [Kifer et al., 2012].
+For DP-PCA we could use our Algorithm 3 to tune the variance of the noise added to the spectral
+gap; for Sparse-DP-ERM we would test the restricted strong convexity parameter (RSC), i.e. not
+adding additional regularization if the RSC is already large.
+Conclusion
+
+Generalized PTR extends the classic “Propose-Test-Release” framework to a more general setting by
+testing the data-dependent privacy loss of an input dataset, rather than its local sensitivity. In this
+paper we’ve provided several examples – private linear regression with hyperparameter selection and
+PATE – to illustrate how generalized PTR can enhance DP algorithm design via a data-adaptive
+approach.
+
+Acknowledgments
+The work was partially supported by NSF Award # 2048091 and the Google Research Scholar Award.
+Yuqing was supported by the Google PhD Fellowship.
+Contents
+1 Introduction
+2 Related Work
+3 Preliminaries
+3.1 Propose-Test-Release . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+4
+
+4 Generalized PTR
+4.1 Limitations of local sensitivity . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+4.2 Which φ to propose . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+4.3 Construction of the DP test . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+6
+7
+
+5 Applications
+5.1 Private Linear Regression . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+5.2 PATE . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+8
+6 Limitations and Future Work
+7 Conclusion
+A Omitted examples in the main body
+A.1 Limits of the classic PTR in private binary voting . . . . . . . . . . . . . . . . . . . . 15
+A.2 Self-concordant generalized linear model (GLM)
+. . . . . . . . . . . . . . . . . . . . . 18
+
+A.3 Differentially privately release λmin ∇ F (θ) . . . . . . . . . . . . . . . . . . . . . . 21
+A.4 Other applications of generalized PTR . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+B Omitted proofs in Section 4
+C Experimental details
+C.1 Experimental details in private linear regression . . . . . . . . . . . . . . . . . . . . . 23
+C.2 Details of PATE case study . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+D Omitted proofs in private GLM
+D.1 Per-instance DP of GLM . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+
+A
+
+Omitted examples in the main body
+
+In this appendix, we provide more examples to demonstrate the merits of generalized PTR. We
+focus on a simple example of post-processed Laplace mechanism in Section A.1 and then an example
+on differentially private learning of generalized linear models in Section 4. In both cases, we observe
+that generalized PTR provides data-adaptive algorithms with formal DP guarantees, that are simple,
+effective and not previously proposed in the literature (to the best of our knowledge).
+
+A.1
+
+Limits of the classic PTR in private binary voting
+
+The following example demonstrates that classic PTR does not capture sufficient data-dependent
+quantities even when the local sensitivity exists and can be efficiently tested.
+Example A.1. Consider a binary class voting problem: n users vote for a binary class {0, 1} and
+the goal is to output the class that is supported by the majority. Let ni denote the number of people
+who vote for the class i. We consider the report-noisy-max mechanism:
+M(X) : argmaxi∈[0,1] ni (X) + Lap(b),
+where b = 1/ denotes the scale of Laplace noise.
+In the example, we will (1) demonstrate the merit of data-dependent DP; and (2) empirically compare
+classic PTR with generalized PTR.
+We first explicitly state the data-dependent DP.
+Theorem A.2. The data-dependent DP of the above example is
+(X) := max
+{| log
+X
+
+p
+1−p
+|, | log
+|},
+p0
+1 − p0
+
+where p := Pr[n0 (X) + Lap(1/) > n1 (X) + Lap(1/)] and p0 := Pr[n0 (X 0 ) + Lap(1/) > n1 (X 0 ) +
+Lap(1/)]. There are four possible neighboring datasets X 0 : n0 (X 0 ) = max(n0 (X) ± 1, 0), n1 (X 0 ) =
+n1 (X) or n0 (X 0 ) = n0 (X), n1 (X 0 ) = max(n1 (X) ± 1, 0).
+In Figure 3(a), we empirically compare the above data-dependent DP with the Laplace mechanism
+by varying the gap between the two vote counts |n0 (X) − n1 (X)|. The noise scale is fixed to  = 10.
+The data-dependent DP substantially improves over the standard DP if the gap is large. However,
+the data-dependent DP is a function of the dataset. We next demonstrate how to apply generalized
+PTR to exploit the data-dependent DP.
+Notice that the probability n0 (X) + Lap(1/) > n1 (X) + Lap(1/) is equal to the probability that a
+random variable Z := X − Y exceeds (n1 (X) − n0 (X)), where X, Y are two independent Lap(1)
+distributions. We can compute the pdf of Z through the convolution of two Laplace distributions,
+1 + |z|
+which implies fX−Y (z) =
+. Let t denote the difference between n1 (X) and n0 (X), i.e.,
+4e|z|
+t = n1 (X) − n0 (X). Then we have
+p = Pr[Z >  · t] =
+
+2+·t
+4 exp( · t)
+
+2 +  · (t + `)
+, where ` ∈ [−1, 1] denotes adding or removing one data point to
+4 exp( · (t + `))
+construct the neighboring dataset X 0 . Therefore, we can upper bound log(p/p0 ) by
+Similarly, p0 =
+
+log
+
+p
+4 exp((t + `))
+2+·t
+=
+·
+p
+4 exp( · t) 2 +  · (t + `)
+
+
+2 + t
+≤  · log
+2 + (t + 1)
+
+
+
+=  log 1 −
+2 + (t + 1)
+
+Then we can apply generalized PTR by privately lower-bounding t.
+On the other hand, the local sensitivity ∆LS (X) of this noise-adding mechanism is 0 if t > 1.
+Specifically, if the gap is larger than one, adding or removing one user will not change the result. To
+10
+6
+
+10 1
+
+data-dependent DP
+Laplace mechanism
+2
+10 2
+5
+
+10 15 20 25 30
+The gap t=|n0(X) n1(X)|
+(a) data-dependent DP vs Laplace mechanism
+
+Gen-PTR( p + )
+classic PTR
+Laplace mechanism
+
+10 28 10 23 10 18 10 13 10 8 10 3 102
+Error
+(b) Privacy-utility tradeoff between three approaches.
+
+Figure 3: In Figure 3(a), we compare the privacy guarantee by varying the gap. In Figure 3(b) We
+fix t = n0 (X) − n1 (X) = 100 and compare privacy cost when the accuracy is aligned. Gen-PTR with
+any choice of privacy budget (˜
+ + 0 ) chosen from the purple region would achieve the same utility as
+Laplace mechanism but with a smaller privacy cost. The curve of Gen-PTR is always below than
+that of the classic PTR, which implies that Gen-PTR can result a tighter privacy analysis when the
+utility is aligned.
+apply classic PTR, we let γ(X) denote the distance to the nearest dataset X such that ∆LS > 0
+and test if γ(X) + Lap(1/) > log(1/δ)
+. Notice in this example that γ(X) = max(t − 1, 0) can be
+
+computed efficiently. We provide the detailed implementation of these approaches.
++ Lap(1/˜
+). Calculate an upper bound of
+1. Gen PTR: lower bound t with tp = t − log(1/δ)
+˜
+data-dependent DP p using Theorem A.2 with tp . The algorithm then tests if p is within an
+predefined privacy budget 0 . If the test passes, the algorithm returns argmaxi∈[0,1] ni (X) +
+Lap(1/) satisfies (˜
+ + 0 , δ)-DP.
++ Lap(1/˜
+). If tp > 1, classic PTR outputs
+2. classic PTR: lower bound t with tp = t − log(1/δ)
+˜
+the ground-truth result else returns a random class. This algorithm satisfies (˜
+, δ)-DP.
+3. Laplace mechanism. M(X) : argmaxi∈[0,1] ni (X) + Lap(1/). M is (, δ)-DP.
+We argue that though the Gen-PTR and the classic PTR are similar in privately lower-bounding
+the data-dependent quantity t, the latter does not capture sufficient information for data-adaptive
+analysis. That is to say, only testing the local sensitivity restricts us from learning helpful information
+to amplify the privacy guarantee if the test fails. In contrast, our generalized PTR, where privacy
+parameters and the local sensitivity parameterize the data-dependent DP, can handle those failure
+cases nicely.
+To confirm this conjecture, Figure 3(b) plots a privacy-utility trade-off curve between these three
+approaches. We consider a voting example with n0 (X) = n1 (X) + 100 and t = 100, chosen such
+that the data-adaptive analysis is favorable.
+In Figure 3(b), we vary the noise scale b = 1/ between [0, 0.5]. For each choice of b, we plot the
+privacy guarantee of three algorithms when the error rate is aligned. For Gen-PTR, we set ˜ = 2b
+p
+and empirically calculate  over 100000 trials.
+In the plot, when   log(1/δ)
+, the classic PTR is even worse than the Laplace mechanism. This is
+t
+because the classic PTR is likely to return ⊥ while the Laplace mechanism returns argmaxi∈[0,1] ni (X)+
+Lap(1/), which contains more useful information. Compared to the Laplace mechanism, Gen-PTR
+requires an extra privacy allocation ˜ to release the gap t. However, it still achieves an overall smaller
+privacy cost when the error rate ≤ 10−5 (the purple region). Meanwhile, Gen-PTR dominates the
+classic PTR (i.e., the dashed black curve is always below the blue curve). Note that the classic PTR
+and the Gen-PTR utilize the gap information differently: the classic PTR outputs ⊥ if the gap is
+not sufficiently large, while the Gen-PTR encodes the gap into the data-dependent DP function
+and tests the data-dependent DP in the end. This empirical result suggests that testing the local
+sensitivity can be loosely compared to testing the data-dependent DP. Thus, Gen-PTR could provide
+a better privacy-utility trade-off.
+
+A.2
+
+Self-concordant generalized linear model (GLM)
+
+In this section, we demonstrate the effectiveness and flexibility of generalized PTR in handling a
+family of GLMs where the link function satisfies a self-concordance assumption. This section is
+organized as follows:
+• Introduce a family of GLMs with the self-concordance property.
+• Introduce a general output perturbation algorithm for private GLMs.
+• Analyze the data-dependent DP of GLMs with the self-concordance property.
+• Provide an example of applying our generalized PTR framework to logistic regression.
+Consider the empirical risk minimization problem of the generalized linear model
+X
+θ∗ = argminθ
+li (θ) + r(θ),
+i=1n
+
+where l : R × R → R belongs to a family of convex GLMs: li (θ) = l(y, xTi θ). Let r : Rd → R be a
+regularization function.
+We now define the self-concordance property.
+Definition A.3 (Generalized self-concordance [Bach, 2010]). A convex and three-times differentiable
+function f : Θ → R is R-generalized-self-concordant on an open nonempty convex set Θ∗ ⊂ Θ with
+respect to norm k · k if for all u ∈ Θ∗ and all v ∈ Rd ,
+∇3 f (u)[v, v, v] ≤ 2Rkvk(∇2 f (u)[v, v]).
+The closer R is to 0, the “nicer” — more self-concordant — the function is. A consequence of (generalized) self-concordance is the spectral (multiplicative) stability of Hessian to small perturbations of
+parameters.
+Lemma A.4 (Stability of Hessian[Nesterov and Nemirovskii, 1994, Theorem 2.1.1], [Bach, 2010,
+Proposition 1]). Let Hθ := ∇2 Fs (θ). If Fs is R-self-concordant at θ, then for any v such that
+RkvkHθ < 1, we have that
+(1 − RkvkHθ )2 ∇2 Fs (θ) ≺ ∇2 Fs (θ + v)
+≺
+∇2 Fs (θ).
+(1 − RkvkHθ )2
+If instead we assume Fs is R-generalized-self-concordant at θ with respect to norm k · k, then
+e−Rkvk ∇2 Fs (θ) ≺ ∇2 Fs (θ + v) ≺ eRkvk ∇2 Fs (θ)
+The two bounds are almost identical when Rkvk and Rkvkθ are close to 0. In particular, for x ≤ 1/2,
+we have that e−2x ≤ 1 − x ≤ e−x .
+In particular, the loss function of binary logistic regression is 1-generalized self-concordant.
+Example A.5 (Binary logistic regression). Assume kxk2 ≤ 1 for all x ∈ X and y ∈ {−1, 1}. Then
+P
+T
+binary logistic regression with datasets in X × Y has a log-likelihood of F (θ) = ni=1 log(1 + e−yi xi θ ).
+The univariate function l := log(1 + exp(·)) satisfies
+|l000 | =
+
+exp (·)(1 − exp (·))
+exp (·)
+:= l00 .
+≤
+(1 + exp (·))
+(1 + exp (·))2
+
+We next apply the modified output perturbation algorithm to privately release θ∗ . The algorithm is
+simply:
+1. Solve
+∗
+
+θ = argminθ
+
+n
+X
+
+li (θ) + r(θ).
+
+i=1
+
+2. Release
+
+θ̂ = θ∗ + Z,
+
+where γ > 0 is a tuning parameter and Z ∼ N (0, γ −1 (
+
+Pn
+2
+−1
+i=1 ∇ li (θ) + ∇ r(θ)) ).
+
+The data-dependent DP of the above procedure is stated as follows.
+Theorem
+A.6 (Data-dependent DP of GLM). Denote the smooth part of the loss function Fs =
+Pn
+i=1 l(yi , < xi , · >) + rs (·). Assume the following:
+1. The GLM loss function l is convex, three-times continuously differentiable and R-generalizedself-concordant w.r.t. k · k2 ,
+2. Fs is locally α-strongly convex w.r.t. k · k2 ,
+3. and in addition, denote L := supθ∈[θ∗ ,θ̃∗ ] |l0 (y, xT θ)|, β := supθ∈[θ∗ ,θ̃∗ ] |l00 (y, xT θ)|. That is, `(·)
+is L-Lipschitz and β-smooth.
+We then have the data-dependent DP
+R(L + β)
+γL2
+(Z) ≤
+(1 + log(2/δ)) +
++
+α
+α
+
+r
+
+γL2
+log(2/δ).
+α
+
+The proof follows by taking an upper bound of the per-instance DP loss (Theorem D.1) (Z, z) over
+z = (x, y) ∈ (X , Y).
+Notice that the Hessians can be arbitrarily singular and α could be 0, which leads to an infinite
+privacy loss without additional assumptions. Thus, we will impose an additional regularization of
+form λ2 ||θ||2 , which ensures that for any dataset FS is λ-strongly convex.
+This is not yet DP because it is still about a fixed dataset. We also need a pre-specified privacy
+budget (, δ). We next demonstrate how to apply the generalized PTR to provide a general solution
+to the above GLM, using logistic regression as an example.
+Remark A.7 (Logistic regression). For logistic regression, we know L ≤ 1, β ≤ 1/4 and if kxk2 ≤ 1,
+it is 1-generalized self-concordant. For any dataset Z = (X, y), the data-dependent DP (X) w.r.t.
+δ can be simplified to:
+r
+1.25
+γ
+γ
+(1 + log(2/δ)) + +
+log(2/δ)
+α
+α
+α
+Now, the data-dependent DP is a function of α and γ, where α denotes the local strong convexity at
+θλ∗ and γ controls the noise scale. We next show how to select these two parameters adapted to the
+dataset.
+Example A.8. We demonstrate here how we apply generalized PTR to output perturbation of the
+logistic regression problem.
+1. Take an exponential grid of parameters {λ} and propose each λ.
+2. Solve for θλ∗ = argminθ F (θ) + λkθk2 /2
+3. Calculate the smallest eigenvalue λmin (∇2 F (θλ∗ )) (e.g., using power method).
+√
+√
+log(4/δ)
+2 log(4/δ)·log(1/δ)∆GS
+p
+4. Differentially privately release λmin with λmin := max{λmin + /2 ·∆GS ·Z−
+, 0},
+/2
+where ∆GS denote the global sensitivity of λmin using Theorem A.11.
+5. Let p (·) be instantiated with (X) w.r.t. δ from Remark A.7, where α = λpmin + λ. Then,
+conditioned on a high probability event, p (·) (a function of γ) is a valid DP bound that holds
+for all datasets and all parameters γ.
+6. Calculate the maximum γ such that pδ/2 (γ) ≤ /2.
+7. Release θ̂ ∼ N (θλ∗ , γ −1 ∇2 Fs (θλ∗ )−1 ).
+8. Evaluate the utility on the validation set and return the (λ, γ) pair that leads to the highest
+utility.
+Theorem A.9. For each proposed λ, the algorithm that releases θ̂ ∼ N (θλ∗ , γ −1 ∇2 Fs (θλ∗ )−1 ) is
+(, 2δ)-DP.
+Proof. The proof follows the recipe of generalized PTR with private upper bound (Example 4.6). First,
+the release of λmin (∇2 F (θλ∗ )) is (/2, δ/2)-DP. Then, with probability at least 1 − δ, pδ (·) > δ (X)
+holds for all X and γ. Finally, γ is chosen such that the valid upper bound is (/2, δ/2)-DP.
+For the hyper-parameter tuning on λ (Steps 1 and 8), we can use Algorithm 3 to evaluate each λ.
+Unlike Example 5.2, the λmin (∇2 F (θλ∗ )) is a complicated data-dependent function of λ. Thus, we
+cannot privately release the data-dependent quantity λmin (∇2 F (θλ∗ )) without an input λ. The PTR
+approach allows us to test a number of different λ and hence get a more favorable privacy-utility
+trade-off.
+An interesting perspective of this algorithm for logistic regression is that increasing the regularization
+α is effectively increasing the number of data points within the soft “margin” 3 of separation, hence a
+larger contribution to the Hessian from the loss function.
+If we think of logistic regression as a smoothed version of SVM, then increasing α leads to more support vectors.
+The “margin” is “softer” in logistic regression, but qualitatively the same.
+Remark A.10. The PTR solution for GLMs follows a similar recipe: propose a regularization
+strength λ; construct a lower bound of the strong convexity α at the optimal solution θλ∗ ; and test
+the validity of data-dependent DP using Theorem D.1.
+Before moving on to other applications of generalized PTR, we will show how to differentially
+privately release λmin according to the requirements of the logistic regression example.
+
+A.3
+
+Differentially privately release λmin (∇2 F (θ))
+
+To privately release λmin ∇2 F (θ), we first need to compute its global sensitivity. Once we have that
+then we can release it differentially privately using either the Laplace mechanism or the Gaussian
+mechanism.
+Theorem
+P A.11 (Global sensitivity of the minimum eigenvalue at the optimal solution). Let
+F (θ) = ni=1 fi (θ) + r(θ) and F̃ (θ) = F (θ) + f (θ) where f1 , ..., fn are loss functions corresponding
+to a particular datapoint x. Let θ∗ = argminθ F (θ) and θ̃∗ = argminθ F̃ (θ). Assume f is L-Lipschitz
+and β-smooth, r(θ) is λ-strongly convex, and F and F̃ are R-self-concordant. If in addition, λ ≥ RL,
+then we have
+sup(λmin (∇2 F (θλ∗ )) − λmin (∇2 F̃ (θ˜λ∗ ))) ≤ 2RL + β.
+X,x
+
+Proof.
+λmin (∇2 F (θλ∗ )) − λmin (∇2 F̃ (θ˜λ∗ ))
+= (λmin (∇2 F (θλ∗ )) − λmin (∇2 F̃ (θλ∗ )))
++ (λmin (∇2 F̃ (θ∗ )) − λmin (∇2 F̃ (θ˜∗ ))).
+λ
+
+(1)
+
+λ
+
+We first bound the part on the left. By applying Weyl’s lemma λ(X + E) − λ(X) ≤ ||E||2 , we have
+˜ ∗ )||2 = ||∇2 f (θ∗ )||2 ≤ β
+sup ||∇2 F (θλ∗ ) − ∇2 F (θ
+λ
+λ
+x
+
+(2)
+
+In order to bound the part on the right, we apply the semidefinite ordering using self-concordance,
+which gives
+˜∗ ∗
+˜∗ ∗
+e−Rkθλ −θλ k ∇2 F̃ (θ˜λ∗ ) ≺ ∇2 F̃ (θλ∗ ) ≺ eRkθλ −θλ k ∇2 F̃ (θ˜λ∗ ).
+By the Courant-Fischer Theorem and the monotonicity theorem, we also have that for the smallest
+eigenvalue
+
+
+
+
+˜∗ ∗
+e−Rkθλ −θλ k λmin ∇2 F̃ (θ˜λ∗ ) ≤ λmin ∇2 F̃ (θλ∗ )
+
+
+(3)
+˜∗ ∗
+≤ eRkθλ −θλ k λmin ∇2 F̃ (θ˜λ∗ ) .
+Moreover by Proposition D.2, we have that
+kθ˜λ∗ − θλ∗ k2 ≤
+
+L
+k∇f (θ˜∗ λ )k
+
+≤
+
+.
+λmin ∇2 F̃ (θ˜λ∗ )
+λmin ∇2 F̃ (θ˜λ∗ )
+
+
+
+If λmin ∇2 F̃ (θ˜λ∗ ) ≥ RL, then use that ex − 1 ≤ 2x for x ≤ 1. Substituting the above bound to (3)
+then to (1) together with (2), we get a data-independent global sensitivity bound of
+λmin (∇2 F (θλ∗ )) − λmin (∇2 F̃ (θ˜λ∗ )) ≤ 2RL + β
+as stated.
+Proposition A.12. Let k · k be a norm and k · k∗ be its dual norm. Let F (θ), f (θ) and F̃ (θ) =
+˜ ∗ be their minimizers, i.e., 0 ∈ ∂F (θ∗ ) and
+F (θ) + f (θ) be proper convex functions and θ∗ and theta
+˜ ∗ ). If in addition, F, F̃ is α, α̃-strongly convex with respect to k · k within the restricted
+0 ∈ ∂ F̃ (theta
+domain θ ∈ {tθ∗ + (1 − t)θ̃∗ | t ∈ [0, 1]}. Then there exists g ∈ ∂f (θ∗ ) and g̃ ∈ ∂f (θ̃∗ ) such that
+
+
+1
+∗
+∗
+kθ − θ̃ k ≤ min
+kg̃k∗ , kgk∗ .
+α
+α̃
+Proof. Apply the first order condition to F restricted to the line segment between θ̃∗ and θ∗ , we get
+α ∗
+kθ̃ − θ∗ k2
+α
+F (θ∗ ) ≥ F (θ̃∗ ) + h∂F (θ̃∗ ), θ∗ − θ̃∗ i + kθ̃∗ − θ∗ k2
+F (θ̃∗ ) ≥ F (θ∗ ) + h∂F (θ∗ ), θ̃∗ − θ∗ i +
+
+(4)
+(5)
+
+Note by the convexity of F and f , ∂ F̃ = ∂F + ∂f , where + is the Minkowski Sum. Therefore,
+0 ∈ ∂ F̃ (θ̃∗ ) implies that there exists g̃ such that g̃ ∈ ∂f (θ̃∗ ) and −g̃ ∈ ∂F (θ̃∗ ). Take −g̃ ∈ ∂F (θ̃∗ ) in
+Equation 10 and 0 ∈ ∂F (θ∗ ) in Equation 9 and add the two inequalities, we obtain
+0 ≥ h−g̃, θ∗ − θ̃∗ i + αkθ̃∗ − θ∗ k2
+≥ −kg̃k∗ kθ∗ − θ̃∗ k + αkθ̃∗ − θ∗ k2 .
+For kθ̃∗ − θ∗ k = 0 the claim is trivially true; otherwise, we can divide both sides of the above
+inequality by kθ̃∗ − θ∗ k and get kθ∗ − θ̃∗ k ≤ α1 kg̃k∗ .
+It remains to show that kθ∗ − θ̃∗ k ≤ α̃1 kgk∗ . This can be obtained by exactly the same arguments
+above but applying strong convexity to F̃ instead. Note that we can actually get something slightly
+stronger than the statement because the inequality holds for all g ∈ ∂f (θ∗ ).
+
+A.4
+
+Other applications of generalized PTR
+
+Besides one-posterior sampling for GLMs, there are plenty of examples that our generalized-PTR
+could be applied, e.g., DP-PCA [Dwork et al., 2014] and Sparse-DP-ERM [Kifer et al., 2012] (when
+the designed matrix is well-behaved).
+[Dwork et al., 2014] provides a PTR style privacy-preserving principle component analysis (PCA).
+The key observation of [Dwork et al., 2014] is that the local sensitivity is quite “small” if there is a
+large eigengap between the k-th and the k + 1-th eigenvalues. Therefore, their approach (Algorithm
+2) chooses to privately release a lower bound of the k-th eigengap (k is fixed as an input) and use
+that to construct a high-confidence upper bound of the local sensitivity.
+For noise-adding mechanisms, the local sensitivity is proportional to the data-dependent loss and
+generalized PTR is applicable. We can formulate the data-dependent DP of DP-PCA as follows:
+Theorem A.13. For a given matrix A ∈ Rm×n , assume each row of A has a bounded `2 norm
+being 1. Let Vk denotes the top k eigenvectors of AT A and dk denotes the gap between the k-th
+and the k + 1-th eigenvalue. Then releasing Vk VkT + E, where E ∈ Rn×n is a symmetric matrix
+with the √
+upper triangle is i.i.d samples from N (0, σ 2 ) satisfies ((A), δ) data-dependent DP and
+(A) =
+log(1.25/δ)
+.
+σ(dk −2)
+The proof is based on the local sensitivity result from [Dwork et al., 2014] and the noise calibration
+of Gaussian mechanism.
+We can combine Theorem A.13 with our Algorithm 3 to instantiate the generalized PTR framework.
+The improvement over Dwork et al. [2014] will be to allow joint tuning of the parameter k and the
+noise variance (added to the spectral gap dk ).
+
+B
+
+Omitted proofs in Section 4
+
+The utility of Algorithm 3 depends on how many rounds that Algorithm 2 is invoked. We next
+provide the utility guarantee of Algorithm 3, which follows a simplification of the result in the
+Section A.2 of Papernot and Steinke [2021].
+Theorem B.1. Suppose applying Algorithm 2 with each φi has an equal probability to achieve the
+highest validation score. Let T̂ denotes the number of invocation of Algorithm 2, where T̂ follows a
+truncated
+distribution. Then the expected quantile of the highest score candidate is given
+ geometric
+
+by ET̂ 1 −
+T̂ +1
+
+.
+In practice, we can roughly set τ = 10k
+so that the algorithm is likely to test all k parameters.
+
+Proof. Suppose each oracle access to Q(X) has a probability 1/k of achiving the best validation
+accuracy. Let β denote the probability that A (shorthand for Algorithm 3) outputs the best choice
+of φi .
+β = 1 − Pr[A(X)is not best]
+
+
+T̂
+= 1 − ET̂ Pr[Q(X)is not best]
+
+
+= 1 − ET̂ (1 − )T̂ .
+k
+Let f (x) = E[xT̂ ]. Applying a first-order approximation on f (1 − k1 ), we have f (1 − k1 ) ≈ f (1) −
+f 0 (1) · k1 = 1 − E[T̂ ]/k. Then, if k is large and we choose τ = 0.1/k, A can roughly return the best
+φi .
+
+C
+
+Experimental details
+
+C.1
+
+Experimental details in private linear regression
+
+We start with the privacy calibration of the OPS-PTR algorithm.
+Algorithm 5 provides the detailed privacy calibration of the private linear regression problem.
+Theorem C.1. Algorithm 5 is (, 2δ)-DP.
+Proof. There are three data-dependent quantities in Theorem 5.1: λmin , ||θλ∗ || and L. First, notice
+that λmin has a global sensitivity of ||X ||2 by Weyl’s lemma. Under the assumption ||X ||2 ≤ 1, we
+privately release λmin using (/4, δ/3) in Step 3. Notice that with probability at least 1 − δ/2, λ̃min
+is a lower bound of λmin .
+Algorithm 5 OPS-PTR: One-Posterior Sample with propose-test-release (no-“perp” version)
+1: Input: Data X, y. Private budget : , δ, proposed regularizer λ.
+
+2: Calculate the minimum eigenvalue λmin (X T X).
+
+
+
+√
+√
+log(6/δ)
+2 log(6/δ)·log(2/δ)
+3: Sample Z ∼ N (0, 1) and privately release λ̃min = max λmin +
+Z−
+,0
+/4
+/4
+4: Calculate θ̂ = (X T X + λI)−1 X T y.
+5: Sample Z ∼ N (0, 1) and privately release ∆ = log(||Y|| + ||X ||||θ̂||) +
+
+log(1+||X ||2 /(λ+λ̃min ))
+√
+Z+
+/(4 6/δ)
+
+log(1+||X ||2 /(λ+λ̃min ))
+√
+.
+/(4 2 log(6/δ) log(2/δ))
+
+6: Set the local Lipschitz L̃ := ||X||e∆ .
+
+7: Calibrate γ with Theorem 5.1(δ/3, /2.)
+γ
+8: Output θ̃ ∼ p(θ|X, y) ∝ e− 2 ||y−Xθ|| +λ||θ||
+Then, we apply Lemma C.2 from Wang [2018] to privately release log(||Y|| + ||X ||||θ̂||) using
+(/4, δ/3). Note that both the local Lipschitz constant L and the norm ||θλ∗ || are functions of
+log(||Y|| + ||X ||||θ̂||). Thus, we can construct a private upper bound of these by post-processing of
+∆.
+Then, with probability at least 1 − δ (by a union bound over λ̃min and ∆), instantiating Theorem 5.1
+with λ̃min and L̃ provides a valid upper bound of the data-dependent DP. We then tune the parameter
+γ using the remaining privacy budget (/2, δ/3).
+Lemma C.2 (Lemma 12 [Wang, 2018]). Let θλ∗ be the ridge regression estimate with parameter
+λ and the smallest eigenvalue of X T X be λmin , then the function log(||Y + ||X ||||θλ∗ ||) has a local
+||2
+).
+sensitivity of log(1 + λ||X
+min+λ
+
+C.2
+
+Details of PATE case study
+
+Definition C.3 (Renyi DP [Mironov, 2017]). We say a randomized algorithm M is (α, M (α))-RDP
+with order α ≥ 1 if for neighboring datasets X, X 0
+Dα (M(X)||M(X 0 )) :=
+
+ 
+Pr[M(X) = o] α
+log Eo∼M(X 0 )
+≤ M (α).
+α−1
+Pr[M(X 0 ) = o]
+At the limit of α → ∞, RDP reduces to (, 0)-DP. We now define the data-dependent Renyi DP
+that conditioned on an input dataset X.
+Definition C.4 (Data-dependent Renyi DP [Papernot et al., 2018]). We say a randomized algorithm
+M is (α, M (α, X))-RDP with order α ≥ 1 for dataset X if for neighboring datasets X 0
+Dα (M(X)||M(X 0 )) :=
+
+ 
+Pr[M(X) = o] α
+log Eo∼M(X 0 )
+≤ M (α, X).
+α−1
+Pr[M(X 0 ) = o]
+RDP features two useful properties.
+Lemma C.5 (Adaptive composition). (M1 ,M2 ) = M1 (·) + M2 (·).
+Lemma C.6 (From RDP to DP). If a randomized algorithm M satisfies (α, (α))-RDP, then M
+also satisfies ((α) + log(1/δ)
+α−1 , δ)-DP for any δ ∈ (0, 1).
+Definition C.7 (Smooth Sensitivity). Given the smoothness parameter β, a β-smooth sensitivity
+of f (X) is defined as
+SSβ (X) := max e−βd ·
+max
+∆LS (X̃ 0 )
+d≥0
+
+X̃ 0 :dist(X,X̃ 0 )≤d
+
+Lemma C.8 (Private upper bound of data-dependent RDP, Restatement of Theorem 5.6). ] Given
+a RDP function RDP(α, X) and a β-smooth sensitivity bound SS(·) of RDP(α, X). Let µ (defined
+in Algorithm 4) denote the private release of log(SSβ (X)). Let (β, σs , σ2 )-GNSS mechanism be
+RDPupper (α):=RDP(α,X)+SSβ (X)·N (0,σs2 )+σs
+
+q
+2 log( δ2 )eµ
+1
+Then, the release of RDPupper (X) satisfies (α, 3α+2
+)-RDP for all 1 < α < 2β
+; w.p. at least 1 − δ2 ,
+2σs2
+upper
+RDP
+(α) is an upper bound of RDP(α, X).
+
+Proof sketch. We first show that releasing the smooth sensitivity SSβ with eµ satisfies (α, 2σα2 )-RDP.
+Notice that the log of SSβ (X) has a bounded global sensitivity β (Definition C.7 implies that
+| log SSβ (X) − log SSβ (X 0 )| ≤ β for any neighboring dataset X, X 0 ). By Gaussian mechanism,
+scaling noise with βσ2 to log SSβ (X) is (α, 2σα2 )-RDP. Therefore, the release of RDP(α, X) is
+(α, s (α) + 2σα2 )-RDP. Since the release of f (X) + SSβ (X) · N (0, σs2 ) is (α, α+1
+)-RDP (Theorem 23
+σ2
+1
+from Papernot et al. [2018]) for α < 2β
+, we have s (α) + 2σα2 = 3α+2
+.
+2σ 2
+s
+
+s
+
+We next prove the second statement. First, notice that with probability at least 1−δ2 /2, eµ ≥ SSβ (X)
+using the standard Gaussian tail bound. Let E denote the event that eµ ≥ SSβ (X).
+
+
+
+upper
+Pr RDP
+(α) ≤ RDP(α, X)
+
+
+
+
+= Pr RDPupper (α) ≤ RDP(α, X)|E + Pr RDPupper (α) ≤ RDP(α, X)|E c
+
+
+upper
+≤ Pr RDP
+(α) ≤ RDP(α, X)|E + δ2 /2
+
+
+p
+µ
+= Pr N (0, σs ) · SSβ(X) ≥ σs · 2 log(2/δ2 )e |E +δ2 /2
+|
+{z
+}
+denoted by(∗)
+
+Condition on the event E, eµ is a valid upper bound of SSβ (X), which implies
+p
+(∗) ≤ Pr[N (0, σs2 ) · SSβ (X) ≥ σs · 2 log(2/δ2 )SSβ (X)|E] ≤ δ2 /2
+Therefore, with probability at least 1 − δ2 , RDPupper (α) ≥ RDP(α, X).
+Theorem C.9 (Restatement of Theorem 5.7). Algorithm 4 satisfies (0 + ˆ, δ)-DP.
+Proof. The privacy analysis consists of two components — the privacy cost of releasing an upper
+bound of data-dependent RDP (upper (α) := s (α) + 2σα2 and the valid upper bound pσ1 (α). First, set
+α = 2 log(2/δ)
++ 1 and use RDP to DP conversion with δ/2 ensures that the cost of δ/2 contribution
+
+q
+2+3α
+to be roughly /2 (i.e., log(2/δ)
+=
+/2).
+Second,
+choosing
+σ
+=
+gives us another /2.
+s
+α−1
+
+Experimental details K = 400 teacher models are trained individually on the disjoint set using
+AlexNet model. We set σ2 = σs = 15.0. Our data-dependent RDP calculation and the smoothsensitivity calculation follow Papernot et al. [2018]. Specifically, we use the following theorem
+(Theorem 6 from Papernot et al. [2018]) to compute the data-dependent RDP of each unlabeled
+data x from the public domain.
+Theorem C.10 (data-dependent RDP Papernot et al. [2018]). Let q̃ ≥ Pr[M(X) 6= Argmaxj∈[C] nj (x)],
+i.e., an upper bound of theprobability that
+ the noisy label does not match the majority label. Assume
+α ≤ µ1 and q̃ ≤ e(µ2 −1)2 /
+
+µ1
+µ2
+µ1 −1 · µ2 −1
+
+µ2
+
+, then we have:
+
+
+
+log (1 − q̃) · A(q̃, µ2 , 2 )α−1 + q̃ · B(q̃, µ1 , 1 )α−1
+α−1
+
+
+µ2 −1
+p
+
+µ
+where A(q̃, µ2 , 2 ) := (1 − q̃)/ 1 − (q̃e ) 2 , B(q̃, µ1 , 1 ) = e1 /q̃ µ1 −1 , µ2 = σ1 · log(1/q̃), µ1 =
+M (α, X) ≤
+
+µ2 + 1, 1 = µ1 /σ12 and 2 = µ2 /σ22 .
+In the experiments, the non-private data-dependent DP baseline is also based on the above theorem.
+Notice that the data-dependent RDP of each query is a function of q̃, where q̃ denotes an upper
+bound of the probability where the plurality output does not match the noisy output. q̃ is a
+complex function of both the noisy scale and data and is not monotonically decreasing when σ1 is
+increasing.
+Simulation of two distributions. The motivation of the experimental design is to compare
+three approaches under different data distributions. Notice that there are K = 400 teachers, which
+implies the number of the vote count for each class will be bounded by 400. In the simulation of
+high-consensus distribution, we choose T = 200 unlabeled public data such that the majority vote
+count will be larger than 150 (i.e., maxj∈[C] nj (x) > 150). For the low-consensus distribution, we
+choose to select T unlabeled data such that the majority vote count will be smaller than 150.
+
+D
+
+Omitted proofs in private GLM
+
+D.1
+
+Per-instance DP of GLM
+
+Theorem D.1 (Per-instance differential privacy guarantee). ConsiderP
+two adjacent data sets Z and
+Z 0 = [Z, (x, y)], and denote the smooth part of the loss function Fs = ni=1 l(yi , hxi , ·i) + rs (·) (thus
+F̃s = Fs + l(y, hx, ·i). Let the local neighborhood be the line segment between θ∗ and θ̃∗ . Assume
+1. the GLM loss function l be convex, three-time continuous differentiable and R-generalized-selfconcordant w.r.t. k · k2 ,
+2. Fs is locally α-strongly convex w.r.t. k · k2 ,
+3. and in addition, denote L := supθ∈[θ∗ ,θ̃∗ ] |l0 (y, xT θ)|, β := supθ∈[θ∗ ,θ̃∗ ] |l00 (y, xT θ)|.
+Then the algorithm obeys (, δ)-pDP for Z and z = (x, y) with any 0 < δ < 2/e and
+
+ 2
+RLkxk2
+γL kxk2H −1 q 2
+α
+ ≤ 0 (1 + log(2/δ)) + e
++ γL kxkH −1 log(2/δ)
+where 0 ≤ e
+
+RLkxk2
+α
+
+− 1 + 2βkxk2H −1 + 2βkxk2H̃ −1 . If we instead assume that l is R-self concordant.
+Then the same results hold, but with all e
+RLkxk2
+α
+
+replaced with (1 − RLkxkH −1 )2 .
+
+Under the stronger three-times continuous differentiable assumption, by mean value theorem, there
+exists ξ on the line-segment between θ∗ and θ̃∗ such that
+Z 1
+
+∗
+∗
+H=
+∇ Fs ((1 − t)θ + tθ̃ )dt = ∇2 Fs (ξ).
+t=0
+
+The two distributions of interests are N (θ∗ , [γ∇2 Fs (θ∗ )]−1 ) and N (θ̃∗ , [γ∇2 Fs (θ̃∗ )+∇2 l(y, xT θ̃∗ )]−1 ).
+Denote [∇2 Fs (θ∗ )]−1 =: Σ and [∇2 Fs (θ̃∗ )+∇2 l(y, xT θ̃∗ )]−1 =: Σ̃. Both the means and the covariance
+matrices are different, so we cannot use multivariate Gaussian mechanism naively. Instead we will
+take the tail bound interpretation of (, δ)-DP and make use of the per-instance DP framework as
+internal steps of the proof.
+First, we can write down the privacy loss random variable in analytic form
+γ
+
+∗ 2
+
+|Σ|−1/2 e− 2 kθ−θ kΣ−1
+
+ −1 
+i
+γh
+|Σ |
+∗ 2
+∗ 2
++
+log
+log
+kθ
+−
+θ
+k
+−
+kθ
+−
+θ̃
+k
+=
+−1
+−1
+γ
+Σ
+∗
+Σ̃
+2
+|Σ̃−1 |
+|Σ̃|−1/2 e− 2 kθ−θ̃ kΣ̃−1
+{z
+}
+|
+{z
+} |
+(∗∗)
+
+(∗)
+
+The general idea of the proof is to simplify the expression above and upper bounding the two terms
+separately using self-concordance and matrix inversion lemma, and ultimately show that the privacy
+loss random variable is dominated by another random variable having an appropriately scaled shifted
+χ-distribution, therefore admits a Gaussian-like tail bound.
+To ensure the presentation is readable, we define a few short hands. We will use H and H̃ to denote
+the Hessian of Fs and Fs + f respectively and subscript 1 2 indicates whether the Hessian evaluated
+at at θ∗ or θ̃∗ . H without any subscript or superscript represents the Hessian of Fs evaluated at ξ as
+previously used.
+
+
+|H1 | |H| |H2 |
+|H1 |
+|H|
+|H2 |
+(∗) = log
+≤
+log
++ log
++ log
+|H| |H2 | |H̃2 |
+|H|
+|H2 |
+|H̃2 |
+By the R-generalized self-concordance of Fs , we can apply Lemma D.3,
+−kθ∗ − ξk2 R ≤ log
+
+|H1 |
+≤ Rkθ∗ − ξk2 ,
+|H|
+
+−Rkξ − θ̃∗ k2 ≤ log
+
+|H|
+≤ Rkξ − θ̃∗ k2 .
+|H2 |
+
+The generalized linear model ensures that the Hessian of f is rank-1:
+∇2 f (θ̃∗ ) = l00 (y, xT θ̃∗ )xxT
+and we can apply Lemma ?? in both ways (taking A = H2 and A = H̃2 ) and obtain
+|H2 |
+=
+= 1 − l00 (y, xT θ̃∗ )xT H̃2 x
+T
+|H̃2 |
+1 + l (y, x θ̃∗ )xT H2−1 x
+Note that l00 (y, xT θ̃∗ )xT H̃2−1 x is the in-sample leverage-score and l00 (y, xT θ̃∗ )xT H2−1 x is the outof-sample leverage-score of the locally linearized problem at θ̃∗ . We denote them by µ2 and µ02
+respectively (similarly, for the consistency of notations, we denote the in-sample and out of sample
+leverage score at θ∗ by µ1 and µ01 ).
+Combine the above arguments we get
+(∗) ≤Rkθ∗ − ξk2 + Rkξ − θ̃∗ k2 + log(1 − µ2 ) ≤ Rkθ∗ − θ̃∗ k2 + log(1 − µ2 )
+
+(6)
+
+(∗) ≥ − Rkθ∗ − θ̃∗ k2 − log(1 − µ2 ).
+
+(7)
+
+We now move on to deal with the second part, where we would like to express everything in terms of
+kθ − θ∗ kH1 , which we know from the algorithm is χ-distributed.
+i
+γh
+(∗∗) =
+kθ − θ∗ k2H1 − kθ − θ∗ k2H2 + kθ − θ∗ k2H2 − kθ − θ̃∗ k2H2 + kθ − θ̃∗ k2H2 − kθ − θ̃∗ k2H̃
+2
+By the generalized self-concordance at θ∗
+∗
+
+∗
+
+∗
+
+∗
+
+e−Rkθ −θ̃ k2 k · k2H1 ≤ k · k2H2 ≤ eRkθ −θ̃ k2 k · k2H1
+This allows us to convert from k · kH2 to k · kH1 , and as a consequence:
+∗
+
+∗
+
+kθ − θ∗ k2H1 − kθ − θ∗ k2H2 ≤ [eRkθ −θ̃ k2 − 1]kθ − θ∗ k2H1 .
+Also,
+D
+E
+kθ − θ∗ k2H2 − kθ − θ̃∗ k2H2 = θ̃∗ − θ∗ , 2θ − 2θ∗ + θ∗ − θ̃∗
+
+H2
+
+= 2hθ − θ∗ , θ̃∗ − θ∗ iH2 − kθ∗ − θ̃∗ k2H2
+
+Therefore
+kθ − θ∗ k2H2 − kθ − θ̃∗ k2H2 ≤ 2kθ − θ∗ kH2 kθ∗ − θ̃∗ kH2 + kθ∗ − θ̃∗ k2H2
+∗
+
+∗
+
+∗
+
+∗
+
+≤ 2eRkθ̃ −θ k2 kθ − θ∗ kH1 kθ∗ − θ̃∗ kH + eRkθ̃ −θ k2 kθ∗ − θ̃∗ k2H .
+Then lastly we have
+h
+i2
+0 ≥ kθ − θ̃∗ k2H2 − kθ − θ̃∗ k2H̃ = −l00 (y, xT θ̃∗ ) hx, θ − θ∗ i + hx, θ∗ − θ̃∗ i
+≥ −2βkxk2H −1 kθ − θ∗ k2H1 − 2βkxk2H −1 kθ∗ − θ̃∗ k2H
+kθ − θ̃∗ k2H2 − kθ − θ̃∗ k2H̃
+≤ 2βkxk2H −1 kθ − θ∗ k2H1 + 2βkxk2H −1 kθ∗ − θ̃∗ k2H
+Combine the above derivations, we get
+
+γ
+akθ − θ∗ k2H1 + bkθ − θ∗ kH1 + c
+|(∗∗)| ≤
+where
+h
+i
+∗
+∗
+a := eRkθ −θ̃ k2 − 1 + 2βkxk2H −1
+Rkθ∗ −θ̃∗ k2
+
+b :=2e
+
+∗
+
+∗
+
+∗
+
+kθ − θ̃ kH
+
+∗
+
+c :=(eRkθ −θ̃ k2 + 2βkxk2H −1 )kθ∗ − θ̃∗ k2H
+(8)
+
+Lastly, by (6) and (8),
+log
+
+γ
+p(θ|Z)
+≤ Rkθ∗ − θ̃∗ k2 + log(1 − µ2 ) + [aW 2 + bW + c].
+p(θ|Z )
+where according to the algorithm W := kθ − θ∗ kH1 follows a half-normal distribution with σ =
+γ −1/2 .
+By standard Gaussian tail bound, we have for all δ < 2/e.
+p
+P(|W | ≤ γ −1/2 log(2/δ)) ≤ δ.
+This implies that a high probability upper bound of the absolute value of the privacy loss random
+p(θ|Z)
+variable log p(θ|Z
+0 ) under p(θ|Z). By the tail bound to privacy conversion lemma (Lemma ??), we
+get that for any set S ⊂ Θ P(θ ∈ S|Z) ≤ e P(θ ∈ S|Z 0 ) + δ for any 0 < δ < 2/e and
+ = Rkθ∗ − θ̃∗ k2 + log(1 − µ2 ) +
+
+γ 1/2 b p
+γc a
++ log(2/δ) +
+log(2/δ).
+2
+Denote v := θ∗ − θ̃∗ , by strong convexity
+kvk2 ≤ k∇l(y, xT θ)[θ̃∗ ]k2 /α = |l0 |kxk2 /α ≤ Lkxk2 /α
+and
+
+kvkH ≤ k∇l(y, xT θ)[θ̃∗ ]kH −1 = |l0 |kxkH −1 ≤ LkxkH −1 .
+
+Also use the fact that | log(1 − µ2 )| ≤ 2µ2 for µ2 < 0.5 and µ2 ≤ βkxk2H̃ −1 , we can then combine
+similar terms and have a more compact representation.
+ 2
+
+RLkxk2
+γL kxk2H −1 q 2
+ ≤ 0 (1 + log(2/δ)) + e α
++ γL kxk2H −1 log(2/δ)
+where
+0 ≤ e
+
+RLkxk2
+α
+
+− 1 + 2βkxk2H −1 + 2βkxk2H̃ −1
+2
+
+is the part of the privacy loss that does not get smaller as γ decreases.
+Proposition D.2. Let k · k be a norm and k · k∗ be its dual norm. Let F (θ), f (θ) and F̃ (θ) =
+∗
+F (θ) + f (θ) be proper convex functions and θ∗ and ˜
+theta be their minimizers, i.e., 0 ∈ ∂F (θ∗ ) and
+˜ ∗ ). If in addition, F, F̃ is α, α̃-strongly convex with respect to k · k within the restricted
+0 ∈ ∂ F̃ (theta
+domain θ ∈ {tθ∗ + (1 − t)θ̃∗ | t ∈ [0, 1]}. Then there exists g ∈ ∂f (θ∗ ) and g̃ ∈ ∂f (θ̃∗ ) such that
+
+
+1
+∗
+∗
+kθ − θ̃ k ≤ min
+kg̃k∗ , kgk∗ .
+α
+α̃
+Proof. Apply the first order condition to F restricted to the line segment between θ̃∗ and θ∗ , there
+are we get
+α ∗
+kθ̃ − θ∗ k2
+α
+F (θ∗ ) ≥ F (θ̃∗ ) + h∂F (θ̃∗ ), θ∗ − θ̃∗ i + kθ̃∗ − θ∗ k2
+F (θ̃∗ ) ≥ F (θ∗ ) + h∂F (θ∗ ), θ̃∗ − θ∗ i +
+(9)
+(10)
+
+Note by the convexity of F and f , ∂ F̃ = ∂F + ∂f , where + is the Minkowski Sum. Therefore,
+0 ∈ ∂ F̃ (θ̃∗ ) implies that there exists g̃ such that g̃ ∈ ∂f (θ̃∗ ) and −g̃ ∈ ∂F (θ̃∗ ). Take −g̃ ∈ ∂F (θ̃∗ ) in
+Equation 10 and 0 ∈ ∂F (θ∗ ) in Equation 9 and add the two inequalities, we obtain
+0 ≥ h−g̃, θ∗ − θ̃∗ i + αkθ̃∗ − θ∗ k2 ≥ −kg̃k∗ kθ∗ − θ̃∗ k + αkθ̃∗ − θ∗ k2 .
+For kθ̃∗ − θ∗ k = 0 the claim is trivially true, otherwise, we can divide the both sides of the above
+inequality by kθ̃∗ − θ∗ k and get kθ∗ − θ̃∗ k ≤ α1 kg̃k∗ .
+It remains to show that kθ∗ − θ̃∗ k ≤ α̃1 kgk∗ . This can be obtained by exactly the same arguments
+above but applying strong convexity to F̃ instead. Note that we can actually get something slightly
+stronger than the statement because the inequality holds for all g ∈ ∂f (θ∗ ).
+A consequence of (generalized) self-concordance is the spectral (multiplicative) stability of Hessian
+to small perturbations of parameters.
+Lemma D.3 (Stability of Hessian[Nesterov and Nemirovskii, 1994, Theorem 2.1.1], [Bach, 2010,
+Proposition 1]). Let Hθ := ∇2 Fs (θ). If Fs is R-self-concordant at θ. Then for any v such that
+RkvkHθ < 1, we have that
+(1 − RkvkHθ )2 ∇2 Fs (θ) ≺ ∇2 Fs (θ + v) ≺
+∇2 Fs (θ).
+(1 − RkvkHθ )2
+
+If instead we assume Fs is R-generalized-self-concordant at θ with respect to norm k · k, then
+e−Rkvk ∇2 Fs (θ) ≺ ∇2 Fs (θ + v) ≺ eRkvk ∇2 Fs (θ)
+The two bounds are almost identical when Rkvk and Rkvkθ are close to 0, in particular, for x ≤ 1/2,
+e−2x ≤ 1 − x ≤ e−x .

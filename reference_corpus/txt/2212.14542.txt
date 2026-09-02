@@ -1,0 +1,2112 @@
+Recurrent Problems in the LOCAL Model
+
+Akanksha Agrawal1 , John Augustine1 , David Peleg2 , and Srikkanth
+Ramachandran1
+Indian Institute of Technology Madras
+Weizmann Institute of Science, Israel
+
+Abstract
+The paper considers the SUPPORTED model of distributed computing introduced
+by Schmid and Suomela [HotSDN’13], generalizing the LOCAL and CONGEST models.
+In this framework, multiple instances of the same problem, differing from each other by
+the subnetwork to which they apply, recur over time, and need to be solved efficiently
+online. To do that, one may rely on an initial preprocessing phase for computing some
+useful information. This preprocessing phase makes it possible, in some cases, to obtain
+improved distributed algorithms, overcoming locality-based time lower bounds.
+A first contribution of the current paper is expanding the spectrum of problem types
+to which the SUPPORTED model applies. In addition to subnetwork -defined recurrent
+problems, we introduce also recurrent problems of two additional types: (i) instances
+defined by partial client sets, and (ii) instances defined by partially fixed outputs.
+Our second contribution is exploring and illustrating the versatility and applicability of the SUPPORTED framework via examining new recurrent variants of three classical graph problems. The first problem is Minimum Client Dominating Set (CDS), a
+recurrent version of the classical dominating set problem with each recurrent instance
+requiring us to dominate a partial client set. We provide a constant time approximation scheme for the CDS problem on trees and planar graphs, overcoming the Ω(log∗ n)
+based locality lower bound. The second problem is Color Completion (CC), a recurrent
+version of the coloring problem in which each recurrent instance comes with a partially
+fixed coloring (of some of the vertices) that must be completed. We study the minimum
+number of new colors and the minimum total number of colors necessary for completing this task. We show that it is not possible to find a constant time approximation
+scheme for the minimum number of additional colors required to complete the precoloring. On the positive side, we provide an algorithm that computes a 2-approximation
+for the total number of colors used in the completed coloring (including the set of
+pre-assigned colors), as well as a one round algorithm for color completion that uses
+an asymptotically optimal number of colors.
+The third problem we study is a recurrent version of Locally Checkable Labellings
+(LCL) on paths of length n. We show that such problems have complexities that are
+either Θ(1) or Θ(n), extending the results of Foerster et al. [INFOCOM’19].
+Contents
+1 Introduction
+1.1 Recurrent Problems . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+1.1.1 Two representative examples: CDS and CC . . . . . . . . . . . . . . .
+1.2 The SUPPORTED model . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+1.3 Our Contributions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+1.4 Related Work . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+3
+5
+7
+
+2 Dominating Sets
+2.1 Client Dominating Set . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+2.2 Lower Bound for Paths . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+2.3 A CTAS for Trees . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+2.4 A CTAS for CDS on Planar Graphs . . . . . . . . . . . . . . . . . . . . . . .
+2.4.1 Constant Approximation for CDS on Planar Graphs . . . . . . . . .
+2.4.2 A 1 +  approximation . . . . . . . . . . . . . . . . . . . . . . . . . .
+8
+11
+17
+3 Color Completion Problems
+3.1 Single Round Color Completion . . . . . . . . . . . . . . . . . . . . . . . . .
+3.2 CC with ∆1+ New Colors . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+3.3 CC Without Preprocessing . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+3.4 CC with fewer than ∆ + 1 colors . . . . . . . . . . . . . . . . . . . . . . . . .
+3.4.1 A recurrent algorithm . . . . . . . . . . . . . . . . . . . . . . . . . .
+3.4.2 Hard examples and negative results . . . . . . . . . . . . . . . . . . .
+26
+29
+31
+4 Recurrent Locally Checkable Labellings (LCL)
+4.1 Subgraph LCL’s without Input Labels on Paths . . . . . . . . . . . . . . . .
+4.2 Recurrent LCL’s on Paths . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+36
+5 Maximal Matching and Maximal Independent Set
+5.1 Maximal Matching . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+5.2 Bipartite graphs are the hardest instances to breach the ∆ barrier . . . . . .
+5.3 Maximal Independent Set . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+43
+45
+1
+
+Introduction
+
+The area of distributed network algorithm concerns the development and analysis of distributed algorithm operating on a network of processors interconnected by communication
+links. In particular, a substantial body of research has been dedicated to the development of
+various graph algorithms for problems whose input consists of the network topology. Examples for such problems are finding maximal independent set (MIS) for the network, finding a
+maximal or maximum matching (MM), a minimum dominating set (MDS), a proper coloring
+with few colors, and so on, and considerable efforts were invested in developing sophisticated
+and highly efficient algorithms for these problems. Such algorithms are particularly significant in settings where the distributed network at hand is dynamic, and its topology keeps
+changing at a high rate.
+The observation motivating the current study is that in many practical settings, the
+network itself may be static, or change relatively infrequently. In such settings, problems
+depending solely on the graph structure need be solved only once. In contrast, there are a
+variety of other problems, related to computational processes that occur repeatedly in the
+network, which need to be solved at a much higher frequency, and whose input consists
+of the network topology together with some other (varying) elements. For such problems,
+the traditional model might not provide a satisfactory solution, in the sense that it may be
+unnecessarily expensive to solve the entire problem afresh for each instance. Rather, it may
+be possible to derive improved algorithmic solutions that take advantage of the fact that the
+network topology is static. We refer to such problems as recurrent problems.
+We envision that depending on the desired problems that the network needs to support,
+one can compute and store additional information about the topology of the network within
+each node, to enable recurrent problems to be solved faster. Inherently this captures an
+aspect of network design. When a network is built, it maybe useful to compute useful
+information about its topology keeping in mind the recurrent problems that it must support
+during its lifetime.
+This framework has already been studied in literature as the SUPPORTED model [21],
+wherein the recurrent problems are simply instances of the original problem but on a (edge
+induced) subgraph of the original graph. Edges of the original graph remain valid communication links. We believe that the SUPPORTED model (as mentioned in [21]) does not fully
+capture all recurrent problems. To demonstrate this, we study a couple of natural extensions
+of the classical local problems of coloring and dominating set.
+
+1.1
+
+Recurrent Problems
+
+We consider graph-related optimization problems each of whose instances hG, Si consists
+of a network topology G = (V, E), on which the distributed algorithm is to be run, and
+some problem-specific input S. The term ”recurrent problem” refers to a setting where the
+network G is fixed, and is the same in all instances (hence we often omit it). Formally, there
+is a stream of instances that arrive from time to time and must be solved efficiently. The
+optimization problem itself may be a variant of some classical graph optimization problem,
+except it has some additional restrictions, specified in each instance S. Two concrete types
+of restrictions that are of particular interest are partial client set (PCS) and partially fixed
+output (PFO).
+Partial client set (PCS) An instance S restricted in this manner specifies a subset C ⊆ V
+of client vertices to which the problem applies. The rest of the vertices are not involved
+(except in their capacity as part of the network). For example, consider the maximum
+matching problem. In the PCS variant of this problem, a PCS-restricted instance will specify
+a vertex subset C such that the matching is only allowed (and required) to connect vertex
+pairs of C.
+Partially fixed output (PFO) An instance S restricted in this manner specifies a part
+of the output. The rest of the output must be determined by the algorithm. For example,
+consider k-centers problem (where the goal is to select a subset C of k vertices serving as
+centers, so as to minimize the maximum distance from any vertex of V to C). In the PFO
+variant of k-centers problem, a PFO-restricted instance will specify a vertex subset Cpre of
+k 0 vertices that were already pre-selected as centers, and the task left to the algorithm is to
+select the remaining k − k 0 centers.
+Naturally, some recurrent problems may involve other novel restrictions as well as hybrids,
+thereby opening up the possibility for rich theory to be developed.
+1.1.1
+
+Two representative examples: CDS and CC
+
+In this paper, we will focus on two concrete examples for recurrent problems of practical
+significance, and use them for illustration. The first of these two example problems, named
+CDS, serves to illustrate a recurrent problem with PCS-restricted instances (where the set
+of clients changes in each instance). The second problem, named CC, illustrates a recurrent
+problem with PFO-restricted instances (where parts of the output are fixed in advance in
+each instance).
+Minimum client-dominating set (CDS) In certain contexts, a dominating set D in a
+network G (i.e., such that every vertex v ∈ V either belongs to D or has a neighbor in D) is
+used for placing servers providing some service to all the vertices in the network (interpreted
+as clients), in settings where it is required that each vertex is served by a server located either
+locally or at one of its neighbors. The minimum dominating set (MDS) problem requires
+finding the smallest possible dominating set for G.
+We consider the recurrent variant of the CDS problem with PCS-restricted instances.
+This problem arises in settings where the set of clients in need of service does not include
+all the vertices of G, but rather varies from one instance to the next. In such settings, the
+network G is static, and from time to time, a set of clients C ⊆ V , formed in an ad-hoc
+manner due to incoming user requests, requests to select and establish a (preferably small)
+subset D of vertices from among their neighbors, which will provide them some service. In
+other words, the set D is required to dominate the vertices in C. On the face of it, solving
+the minimum dominating set problem once on G may be useful, but not guarantee optimal
+results for each recurrent instance S; rather, for each instance S, it may be necessary to solve
+the specialized problem once the request appears in the network. Hereafter, we refer to this
+problem as minimum client-dominating set (CDS).
+Note that one may also consider a generalized problem that includes also a PFO component, by specifying in each instance S also a partial set D0 of vertices that were pre-selected
+as servers (or dominators). Our results are presented for the CDS problem (without PFO restrictions), but it should be clear that they can easily be extended to the generalized problem
+with PFO restrictions1 .
+Color Completion (CC) In certain contexts, a proper coloring of a distributed network
+is used for purposes of scheduling various mutually exclusive tasks over the processors of
+the network. For example, suppose that performing a certain task by a processor requires
+it to temporarily lock all its adjacent links for its exclusive use, preventing their use by
+the processor at the other end. Employing a proper coloring as the schedule (in which all
+the processors colored by color t operate simultaneously at round t) enables such mutually
+exclusive operation. Naturally, it is desirable to use as few colors as possible, in order to
+maximize parallelism.
+We consider the recurrent variant of the coloring problem with PFO-restricted instances.
+From time to time we may receive a partial (collision-free) coloring assignment to some subset
+C ⊆ V of the vertices, representing processors constrained to operate on some particular time
+slots. We are required to color all the remaining vertices in V \ C properly and consistently
+with the initial coloring. Typically, using colors already occurring in the precoloring (i.e.,
+used by some vertices in the set C) is fine, since these time slots are already committed for
+the task at hand. However, it is desirable to use as few new time slots (or new colors), to
+minimize the overall time spent on the task.
+Note that one may also consider a generalized problem that includes also a PCS component, by specifying in each instance S also a partial set V 0 of vertices that are interested in
+being scheduled, and hence need to be colored. Our results are presented for the CC problem
+(without PCS restrictions), but it should be clear that they can easily be extended to the
+generalized problem with PCS restrictions2 .
+
+1.2
+
+The SUPPORTED model
+
+The SUPPORTED model is an extension of the well studied LOCAL and CONGEST models with an additional preprocessing phase. Specifically the solution to a problem in the
+SUPPORTED model consists of two stages, (i) a preprocessing stage and (ii) an online stage.
+• In the preprocessing stage, run an algorithm Apre (G) on the topology of the network
+Essentially, for this problem, the pre-selected vertices of D0 can be used to satisfy all the clients that
+neighbor them, leaving us with a smaller set C 0 of unsatisfied clients that need to be covered.
+Essentially, for this problem, the vertices of V \ V 0 , which do not require coloring, can simply avoid
+participating in the coloring process.
+5
+
+G and obtain information Inf(G) to be stored at the network vertices (different vertices
+may of course store different information).
+• During runtime, a stream of instances arrive. Whenever a new instance S arrives, run
+an algorithm A(S, Inf(G)) to solve this problem instance.
+In view of the fact that the preprocessing stage takes place only once, the particulars of
+the preprocessing algorithm are less important to us, and we allow it to be arbitrary (even
+oracular). For the scope of this paper, in the upper bounds that we show, all our preprocessing phases are decidable, whereas the lower bounds hold for any arbitrary preprocessing.
+In the online stage, we insist that the computations performed by each node in a single
+round must be polynomial in the size of the graph. Therefore even knowledge of the complete
+network for each node might not be sufficient, as underlying information about the topology
+(such as chromatic number) might not be computable in polynomial time.
+For a given problem Π on a graph G, one may seek to optimize several parameters. For the
+scope of this paper, we consider only two, (i) the round complexity of the online algorithm,
+i.e., the number of synchronous rounds required to solve each recurrent instance and (ii) the
+size of the output to each node in the preprocessing phase, i.e., the amount of additional
+information that needs to be stored in each node of the graph from the preprocessing phase.
+We use Tsup (Π, G) to denote the worst case online round complexity for any deterministic
+algorithm across all instances of Π. We use Ssup (Π, G) to be the optimal size of the output
+to each node in the preprocessing phase that enables Π to be solved in Tsup (Π, G) rounds
+in the online stage. We use Tlocal (Π, p) to denote the worst case round complexity for Π in
+the classical local model on all graphs with given parameter p. Depending on the problem,
+Tlocal (Π) may be described by a combination of different parameters of the input graph,
+such as the number of nodes n or maximum degree ∆.
+
+1.3
+
+Our Contributions
+
+In Section 2, study the CDS problem. We first show that even on a path, it is not possible
+to optimally solve CDS in o(n) time. We next look at 1 +  approximations. Weshow that
+
+log
+on trees and planar graphs, one can obtain a 1 +  approximation in O( 1 ) and Õ 1 24/23
+rounds respectively. To achieve these bounds, we only require to store O(1) bits per node as
+the output of the preprocessing phase.
+In Section 3, we study the CC problem. We provide an algorithm to complete a given
+coloring using at most χ(∆ + 1)/k new colors in k rounds. We show that for k = 1, the
+number of colors used is asymptotically tight in the worst case.
+In Section 4, we study a generic class of problems called Locally Checkable Labellings
+(LCL). We show that on a path, every LCL problem either has worst case complexity Θ(1)
+or Θ(n). In the specific case of recurrent problems where the online instances are a specific
+LCL on a sub-path of the given path (as considered in prior works such as [13]), we provide
+an efficient centralized algorithm to classify the LCL into one of the two cases and also
+construct the distributed algorithm to solve an LCL given its description, thereby extending
+the results in [13]. In our construction, the preprocessing phase requires only O(1) additional
+bits to be stored per node.
+Finally in Section 5, we provide some partial results on sub-graph maximal matching
+and sub-graph maximal independent set that could potentially be useful in finding optimal
+solutions for these problems in the SUPPORTED model.
+
+1.4
+
+Related Work
+
+The SUPPORTED model for first proposed by Schmid and Suomela [21]. Foerster et al. [13]
+provide several results including lower bounds for problems such as sinkless orientation and
+approximating independent set. For global network optimization problems, such as minimum
+spanning tree, near optimal universal lower and upper bounds have been shown by ([15]).
+We stress that in all related prior work above, the problems to be solved are same as the
+traditional problems, but on a subgraph of the given graph. Most of our solutions here are
+adaptations of existing algorithms for the relevant problems in the LOCAL model.
+Dominating Set. Czygrinow et al [11] provided an O (log∗ n) round algorithm for a
+1 +  approximation for the dominating set problem and it was later extended to bounded
+genus graphs by Amiri et al[2]. Foerster et al. [13] briefly discuss about extending these
+results to the SUPPORTED model.
+Coloring. Color Completion has been one of the methods used for ∆ + 1 coloring
+graphs in log∗ n + f (∆) rounds. Existing algorithms decide on a coloring for a subgraph of
+the given graph and then recursively complete the chosen coloring. Barenboim [6] provided
+the first sublinear
+in ∆ algorithm. The current best known algorithm has round complexity
+√
+log∗ n+O( ∆ log ∆) (see [19, 7, 14]). Maus [19] also provided a smooth tradeoff between the
+number of colors and the round complexity, specifically√in k + log∗ n rounds, graphs can be
+properly colored using O(∆2 /k) colors for any 1 ≤ k ≤ ∆. We note that Maus’s algorithm
+does not provide a ∆ + 1 coloring but rather an O(∆) coloring.
+LCL. Locally Checkable Labellings (LCL) were first proposed by Naor and Stockmeyer
+[20]. Chang et al. [9] showed gaps in the deterministic complexity of LCL’s. They showed
+that the worst case deterministic round complexity of LCL’s on any hereditary graph class is
+either ω(log∆ n) or O(log∗ n). They also show that for paths, there is no LCL with complexity
+o(n) and ω(log∗ n). Later Chang et al [10] showed that on trees, the deterministic worst
+case complexities for LCL’s is either Θ(1), Θ(log∗ n), Θ(log n) or nΘ(1) . They also provide
+examples of LCL’s with complexity Θ(n1/k ) for any integer k. More recently, Balliu et al. [5]
+showed that for a more restricted class of LCL problems called homogenous LCL problems,
+on rooted trees, there is a centralized algorithm that takes as input the description of the LCL
+and decides which of the above complexity classes it belongs to. Given the LCL, deciding
+its distributed complexity class on trees was shown to be EXPTIME hard by Chang [8].
+G
+
+G
+
+(a)
+
+(b)
+
+Figure 1: (a) PTAS preserving reduction (b) Locality preserving reduction, black vertices
+are clients, thick edges and gray vertices are added.
+Dominating Sets
+
+2.1
+
+Client Dominating Set
+
+Definition 2.1 (Client Dominating Set). Given a graph G and a subset of its vertices
+C ⊆ V (G), called the client set, we say that a subset D is a client dominating set of G, C if
+for every client c ∈ C, there exists v ∈ D such that either v = c or v is a neighbor of c.
+Definition 2.2 (Minimum Client Dominating Set (CDS)). Given a graph G and a subset of
+its vertices C ⊆ V (G), called the client set, find a client dominating set of minimum size.
+The CDS problem is of course a generalization of the Dominating Set problem as the
+dominating set is precisely the case when C = V (G). It is also possible to reduce the CDS
+problem to an instance of a Dominating Set problem. Given a graph G and a client set C,
+we can construct a graph GC which is obtained by adding a path on two vertices, P2 to G
+and connecting every nonclient vertex (i.e. V (G) \ C) to one end of the path P2 . See Figure
+1 (a).
+Claim 2.3. Given a graph G and a client set C ⊆ V (G), consider the graph GC with
+• V (GC ) = V (G) ∪ {u1 , u2 } where u1 , u2 6∈ V (G) are two new vertices
+• E(GC ) = E(G) ∪ {(u1 , v) | v ∈ V (G) \ C} ∪ {(u1 , u2 )}
+For any D ⊆ V (GC ), D ∩ V (G) is a client dominating set of G, C if and only if D ∪ {u1 }
+is a dominating set of GC .
+Proof. (⇒) Suppose D ∩V (G) is a client dominating set of G, C, then all vertices in C have a
+neighbor in D ∩V (G). Now we look at those vertices in GC that are dominated by D ∩V (G).
+The only possible vertices that are not dominated in GC are the non clients V (G) \ C and
+the two vertices u1 , u2 . Notice that u1 dominates all of them. Therefore (D ∩ V (G)) ∪ {u1 }
+dominates GC . D ∪ {u1 } is the almost the same set, except possibly with u2 removed. As
+u2 is not necessary when u1 is present, D ∪ {u1 } must dominate GC .
+(⇐) Suppose D ∪ {u1 } is a dominating set for GC . u1 only dominates the vertices
+V (G) \ C, u1 , u2 . The dominators of the remaining vertices (i.e C) must thus be present
+solely in V (G), i.e., they must be (D ∪ {u1 }) ∩ V (G) = D ∩ V (G).
+Notice that given a dominating set D of GC , one can replace u2 (if it exists in the solution)
+with u1 and then by Claim 2.3, D ∩ V (G) is a client dominating set. If D is optimal, then
+D∩V (G) must an optimal client dominating set. Furthermore, suppose a 1+ approximation
+for the dominating set is known for GC , then using Claim 2.3 we can get a dominating set
+of size (1 + )(|D∗ | + 1) − 1 = (1 + )|D∗ | +  ≤ (1 + 2)|D∗ |.
+The above reduction holds only for centralized algorithms. Since the above reduction does
+not preserve locality, non-clients which are far apart in G may be close in GC , a distributed
+algorithm for dominating set does not immediately imply a distributed algorithm for CDS
+with the same round complexity. While we are unable to provide a locality preserving
+reduction for 1 +  approximating a dominating set, we shall discuss one attempt, which is
+a slight modification of the above. To each non-client, connect a different path of length 2,
+instead of the same path as we have done here (See Figure 1 (b)). While the new reduction
+is locality preserving and one can obtain an optimal solution via the new reduction, it does
+not seem straightforward to obtain an approximation. The reason is that the size of the
+dominating set for GC is more than the corresponding client dominating set by an additive
+|V (G)| − |C| term. Thus if D∗ is a client dominating set, the corresponding dominating set
+in GC has size, (1 + )(|D∗ | + |V (G)| − |C|) − (|V (G)| − |C|) = (1 + )|D∗ | + (|V (G)| − |C|).
+The additive term (|V (G)| − |C|) is too expensive and does not lead to even a constant
+approximation as |D∗ | could be arbitrarily small (even 1) compared to (|V (G)| − |C|).
+
+2.2
+
+Lower Bound for Paths
+
+We establish two lower bounds for CDS on a path. First, we argue that, regardless of the
+preprocessing, the online runtime of every (exact) deterministic distributed algorithm for
+the CDS problem must take time Ω(D) on networks of diameter D. Second, we show that
+the online runtime of every deterministic distributed approximation algorithm for CDS with
+ratio 1 +  must require time Ω(1/) on some input.
+Theorem 2.4. Let A be a deterministic distributed local algorithm for CDS with arbitrary
+preprocessing. Then there exists some input for which A requires Ω(D) time.
+Proof. We prove the statement by contradiction. Suppose there exists a deterministic algorithm A whose worst case run time is o(D). Consider a path P = (v1 , v2 , . . . vn ) where
+n = 4k + 2 for even k and the following two instances of clients (see Figure 2):
+1. C1 = {v2 , v4 , . . . v4k }, i.e., every vertex at an odd distance from the leftmost vertex
+except vn .
+2. C2 = {v4 , v6 , . . . v4k+2 }, i.e., every vertex at an odd distance from the leftmost vertex
+except v2 .
+v2
+
+vn
+2k
+
+2k
+(a) Instance C1
+
+v2
+
+vn
+(b) Instance C2
+
+Figure 2: The instances C1 and C2 , differing in v2 and vn . Red double circles denote clients.
+The blue node is v2k+1 .
+Both these instances have unique optimal solutions that are disjoint. For C1 , the optimal
+solution is to place the dominators at v3 , v7 , . . . v4k−1 , whereas for C2 the optimal solution is
+to place them at v5 , v9 , . . . v4k+1 . Consider the vertex v2k+1 . It must be chosen as a dominator
+in exactly one of the two given instances. Since A operates in t = o(D) = o(k) rounds, the
+inputs in the t-neighborhood of v2k+1 , which are observable to v2k+1 during the execution, are
+identical in both instances, and hence the output of v2k+1 must be identical as well, yielding
+the desired contradiction.
+Theorem 2.5. Let A be a deterministic distributed local approximation algorithm for CDS,
+with arbitrary preprocessing, whose online runtime on every path and every instance is at
+most k = 4` + 1 for some integer ` ≥ 1. There exists a network and a set of clients for which
+the approximation ratio of A is at least 1 + 1/(k + 2).
+
+Figure 3: An illustration of the instance (P, S) for ` = 1. Here k = 5. The client vertices of
+the set S are drawn as double red circles. The vertices included in the optimal dominating
+set D∗ for S are marked by ∗. The vertices included in the optimal dominating set D∗ for
+the modified instance S 0 are marked by ∗0 .
+Proof. Consider an algorithm A as specified in the theorem. Let P = (v1 , v2 , . . . , v4k+7 ) be
+a path with ID(vi ) = i for every i. For i ≤ j, denote by P [vi , vj ] the subpath of a path P
+from vi to vj .
+Assume an arbitrary preprocessing stage took place, providing the vertices of P with
+some additional information. Let the client set S consist of all the odd-indexed vertices on
+P . Consider the execution of A on P and S. Partition P into three subpaths, A = P [v1 , vk+3 ],
+B = P [vk+4 , v3k+5 ], and C = P [v3k+6 , v4k+7 ]. (See Fig. 3 for an illustration.)
+Let D be the set of vertices chosen to the dominating set by the algorithm. For X ∈
+{A, B, C}, let S[X] = S ∩ X be the set of clients in the subpath X, and D[X] = D ∩ X be
+the set of dominators selected in X. There are three cases to consider.
+Case (1): |D[B]| ≥ 2` + 2.
+Note that no matter where the dominators of D[B] are placed within the subpath B, at least
+` + 1 dominators must be selected in the subpath C in order to dominate all the clients of
+S[C]. In particular, this holds even if some dominator in D[B] dominates the leftmost client
+in C, v3k+6 (node 21 in Fig. 3). Similarly, at least ` + 1 dominators must be selected in
+the subpath A in order to dominate all the clients of S[A]. (Here, the dominators in D[B]
+cannot help.) Altogether, |D| ≥ 4` + 4. On the other hand, note that the unique optimum
+solution for this instance, D∗ = {v2 , v6 , v10 , . . . , v26 }, consists of 4` + 3 dominators (see Fig.
+3). Hence in this case, the approximation ratio of A is no better than (4` + 4)/(4` + 3).
+Case (2): |D[B]| = 2` + 1 but D[B] does not dominate all of S[B].
+In this case, some of the clients of S[B] must be dominated by dominators outside the subpath
+B. Inspecting the structure, it is clear that the only client in B that may be dominated by
+a dominator outside B is the leftmost client, vk+4 (node 9 in Fig. 3), and the only way to
+do that is by selecting vk+3 , the rightmost node in A, to D. It is also clear that despite such
+a selection, D[A] must contain at least ` + 1 additional dominators in order to dominate all
+the clients of S[A]. Also, |D[C]| ≥ ` + 1 is necessary to dominate S[C]. Hence again, overall
+|D| ≥ 4` + 4, yielding the same approximation ratio as in case (1).
+Case (3): |D[B]| = 2` + 1 and D[B] dominates all of S[B].
+Note that in this case, the unique choice is D[B] = {vk+5 , vk+9 , ·, v3k+3 }. Define another
+instance consisting of the client set S 0 = S \ {v1 , v4k+7 }, namely, S with the first and last
+vertices omitted, and consider the execution of algorithm A on this instance. Notice that
+in a k-round distributed execution, each node is exposed only to information collected from
+its distance-k neighborhood. This implies that the vertices of B see exactly the same view
+in this new execution on S 0 as in the execution on S, so their output must be the same.
+Hence D0 [B] = D[B] (and hence |D0 [B]| = 2` + 1). Also note that despite the fact that
+each of A and C now have one client fewer than in S, we must have |D0 [A]| ≥ ` + 1 and
+|D0 [C]| ≥ ` + 1 in order to dominate all the clients of S 0 [A] and S 0 [C], respectively. Hence in
+total |D0 | ≥ 4`+3. However, for this instance the optimum solution D∗ = {v4 , v8 , . . . , v4k+4 }
+is smaller, consisting of only k + 1 = 4` + 2 vertices (see Fig. 3). Hence in this case, the
+approximation ratio of A is (4` + 3)/(4` + 2) or higher.
+In summary over all cases, the approximation ratio of A is
+
+
+4` + 4
+k+3
+4` + 3
+,
+=
+= 1+
+.
+min
+4` + 2
+4` + 3
+k+2
+k+2
+
+2.3
+
+A CTAS for Trees
+
+In this section we describe the CTAS for CDS on trees, prove its correctness and analyze its
+complexity.
+Like the CTAS on a path, the algorithm for trees is based on a preprocessing stage in
+which the tree is partitioned into subtrees of depth O(k) for integer parameter k. Each
+recurrent instance is then solved by computing a local near-optimal CDS on each subtree,
+while taking care to ensure that the resulting solutions combine into a 1 + 4/(k − 1) approximation of the optimal global solution. The “interface” between adjacent subtrees is more
+difficult to handle than in the case of paths, as making a single change in the selection in
+one subtree (e.g., in one of its leaves) might affect several adjacent subtrees, which makes
+both the algorithm and its analysis somewhat more complex.
+Let us first describe the preprocessing stage, which is applied to the network tree T . The
+algorithm has an integer parameter ` ≥ 1 and sets k = 4` + 1. Root the tree T at a root
+vertex r0 , and mark each vertex v by its layer layer(v), namely, its distance from r0 (by
+definition layer(r0 ) = 0). Partition the tree T into subtrees by taking every vertex v with
+layer(v) = pk for integer p ≥ 0 as a root and defining T [v] as the subtree of depth k rooted
+at v. See Fig. 4(a). For notational convenience, we sometimes use T [v] to denote also the
+vertex set of the subtree T [v]. Also, for any subtree T [v] and vertex set X ⊆ T , we denote
+X[v] = X ∩ T [v].
+
+Figure 4: (a) A decomposition of the tree T into subtrees for ` = 1, k = 5. Layer-leaves
+are marked by a blue dashed circle, and real leaves are marked by a green double circle.
+(b) A cut I-tree, k = 5. The client vertices of S are drawn as double red circles. The cuts
+along root-to-root paths are marked by blue dashed elypses. The peak-tree Ť [v] is marked
+by a purple dashed curve.
+The leaves of a subtree T [v] can be classified into real leaves and layer-leaves, namely,
+leaves of T [v] that are internal nodes in T . A subtree that has no other subtree below it
+(namely, all of whose leaves are real) is called a leaf-subtree or simply L-tree. Otherwise, it is
+called an internal-subtree or I-tree. (See Fig. 4(a).) We partition the vertices of T into two
+subsets. Let lleaves be the set of all layer-leaves, and int be the set of all remainig vertices.
+This induces a partition of the vertices of each subtree T [v] into lleaves[v] and int[v]. (For
+an L-tree, lleaves[v] = ∅.)
+During the recurrent stage, each instance consists of a set S of clients. This induces
+additional distinctions on the tree structure. Internal subtrees are classified into two types.
+The I-tree T [v] is called a cut I-tree if on every path from v to a root w hanging from a
+layer-leaf of T [v] there are two consecutive vertices that do not belong to S. See Fig. 4(b).
+The figure also illustrates the fact that in a cut I-tree T [v] one can identify a subtree Ť [v],
+referred to as the peak of T [v], with the property that for every edge (x, y) connecting a vertex
+x ∈ Ť [v] to a child y ∈
+/ Ť [v], both x, y 6∈ S. This implies that nodes below Ť [v] cannot help
+in dominating clients in Ť [v], namely, taking them into D cannot dominate client vertices in
+Ť [v]. T [v] is a full I-tree if it is not a cut I-tree, namely, there is at least one path from v to
+a root w hanging from some layer-leaf of T [v] with no two consecutive vertices of V \ S.
+The idea behind the approximation scheme is as follows. Our algorithm solves the CDS
+problem separately, in an optimal manner, on each subtree T [v] of depth at most k for the
+client set S[v]. This can be done in time O(k), but might entail inaccuracies. As illustrated
+in the lower bound of Sect. 2.2, the main hindrance to the accuracy of a local distributed
+algorithm for CDS stems from long paths with a periodic occurrence of client vertices. Such
+a path, threading its way along some root-to-leaf path in T , might be handled poorly by
+the local computations. Our goal is to bound the loss by at most 1 per subtree in the
+decomposition. This is justified for full I-trees, since in a full I-tree the optimum solution D∗
+must also use Ω(k) dominators to cover all the clients, so the inaccuracy ratio is just 1/Ω(k).
+This approach is made complicated due to the fact that some subtrees are not full, and
+may require only a small number of dominators. For such subtrees (specifically, L-trees and
+cut I-trees), we cannot allow the algorithm to “waste” more than the optimum solution.
+Hence when comparing the number of dominators used by the algorithm to that of the
+optimum D∗ , we must use an accounting method that will equate the costs over L-trees and
+cut I-trees, and charge all the “waste” to full I-trees.
+This is done as follows. In a first phase, we locally solve the problem optimally in each
+L-tree and cut I-tree. This is only used in order to decide, for each such subtree T [v],
+whether the root’s parent, denoted parent(v), must belong to the dominating set. This is
+important since these vertices cover the “interference layers” between adjacent subtrees. For
+the full I-trees, an optimal local solution cannot be computed. Therefore, we artificially
+impose a “waste” in every full I-tree T [v], by selecting the parent of its root, parent(v), as
+a dominator, whether or not necessary. As explained above, this “waste” is justified by the
+fact that D∗ must also use Ω(k) dominators in these subtrees. As a result, when we compute
+a dominating set for the remaining undominated clients in the second phase of the algorithm,
+the solution computed by the algorithm on each subtree T 0 is no greater than the number
+of D∗ dominators in T 0 .
+Optimal procedure Pup
+A simple procedure Pup we use is an optimal algorithm for CDS on rooted trees, which runs
+in time O(depth(T )) on a tree T . The algorithm starts with an empty set of dominators D
+and works its way from the leaves up, handling each node w only after it finishes handling
+all its children. It adds w to the set D in one of the following two cases:
+(1) Some of w’s children are clients and are not yet dominated, or
+(2) w itself is an undominated client and is the root.
+It is easy to verify that this algorithm yields a minimum cardinality solution for CDS. It
+is also easy to implement this greedy algorithm as an O(depth(T )) time distributed protocol.
+Modification for subtrees: When applying this procedure to a subtree T [v] of T where
+v is not the root of T , we make the following small but important modification: When
+the procedure reaches v itself, if v ∈ S and v is still non-dominated, then we add parent(v)
+instead of v to the solution. (This can be done since parent(v) belongs to the tree T , although
+it is outside the subtree T [v].)
+Approximation algorithm APPR
+1: procedure APPR
+2:
+for every subtree T [v] do
+3:
+Decide if it is an L-tree, a cut I-treeor a full I-tree
+4:
+Dlleaves[v] ← ∅
+5:
+RL ← {v | T [v] is an L-tree} (* L-tree roots *)
+6:
+RC ← {v | T [v] is a cut I-tree} (* cut I-tree roots *)
+7:
+RF ← {v | T [v] is a full I-tree} (* full I-tree roots *)
+8:
+R ← RL ∪ RC ∪ RF (* all subtree roots *)
+9:
+end for
+10:
+11:
+12:
+13:
+14:
+15:
+16:
+17:
+18:
+19:
+20:
+21:
+22:
+23:
+
+(* First dominator selection phase *)
+for every L-tree T [v] do
+Apply Procedure Pup to (T [v], S[v])
+if parent(v) ∈ T [w] was selected as a dominator then
+let Dlleaves [w] ← Dlleaves [w] ∪ {parent(v)}
+end if
+end for
+for every cut I-tree T [v] do
+Apply Procedure Pup to the peak-tree (Ť [v], S ∩ Ť [v])
+if parent(v) ∈ T [w] was selected as a dominator then
+let Dlleaves [w] ← Dlleaves [w] ∪ {parent(v)}
+end if
+end for
+for every full I-tree T [v], with parent(v) ∈ T [w] do
+Dlleaves [w] ← Dlleaves [w] ∪ {parent(v)}
+S
+Dlleaves ← v∈R Dlleaves [v]
+let S 0 be the set of all vertices that are dominated by Dlleaves
+S 00 ← S \ S 0 (* Remaining undominated clients *)
+end for
+(* Second dominator selection phase *)
+28:
+for every subtree T [v] do
+29:
+Apply Procedure Pup to (T [v], S 00 [v])
+30:
+Let Dint [v] be its output set of dominators (* these are all internal nodes *)
+31:
+end forS
+32:
+Dint ← v∈R Dint [v]
+33:
+return DA ← Dlleaves ∪ Dint
+34: end procedure
+24:
+25:
+26:
+27:
+
+Analysis
+For an instance (T, S) of CDS, a set D is said to be an upmost dominating set if it has the
+following property: For every w ∈ D, replacing w by parent(w) results in a non-dominating
+set. (This property also suggests a natural bottom-up process for transforming a solution D
+into an upmost solution D0 of the same size.)
+Denote the optimum solution by D∗ . Without loss of generality we may assume that
+D∗ is an upmost dominating set. The following is immediate from the definition of upmost
+dominating sets.
+Observation 2.6. Consider an instance (T, S) of CDS and an upmost dominating set D
+for it. If v ∈ D, then there exists some child v 0 of v in T such that v 0 ∈ S and v is its only
+dominator (or in other words, no child of v 0 is in D).
+Observation 2.7. For any instance (T, S) of CDS, the dominating set selected by Procedure
+Pup is equal to the unique optimum upmost solution D∗ .
+We further partition the dominators of D∗ [v] into subsets, according to whether they are
+layer-leaves or internal nodes, and identify also the set of all external dominators, namely,
+dominators that are either outside T [v] or layer-leaves.
+D∗,lleaves [v] S
+= D∗ ∩ lleaves[v],
+D∗,int [v]S= D∗ ∩ int[v],
+D∗,ext [v] = D∗ \ D∗,int [v],
+D∗,lleaves = v∈R D∗,lleaves [v],
+D∗,int = v∈R D∗,int [v].
+We also partition the vertices in each set Dlleaves [v] into two subsets. Let
+lleaves
+DC,L
+[v] ={w | w was added to Dlleaves [v] in Steps 9 and 15 of the algorithm},
+
+DFlleaves [v] ={w | w was added to Dlleaves [v] in Step 21 of the algorithm},
+P
+P
+lleaves
+lleaves
+DC,L
+= v∈RT DC,L
+[v],
+DFlleaves = v∈RT DFlleaves [v].
+Observation 2.8. For every v ∈ RL , where z = parent(v) ∈ T [w],
+(a) Dlleaves [v] = D∗,lleaves [v] = ∅, and
+(b) Dint [v] = D∗,int [v].
+Proof. Claim (a) follows trivially since L-trees have no layer-leaves, so lleaves[v] = ∅.
+Claim (b) follows from the observation that for an L-tree T [v], both D and D∗ induce
+optimum upmost dominating sets for T [v], and these induced dominating sets, D̃ and D̃∗ ,
+are identical by Obs. 2.7.
+It may be instrumental to pause and make the following observation concerning the sets
+D̃ and D̃∗ discussed in the above proof. For the purpose of dominating the clients of S[v],
+either both sets contain z = parent(v) or both do not. One might hope that this will establish
+that D∗,lleaves [w] = Dlleaves [w]. However, this argument is false, since we need to account for
+the possibility that one of the dominating sets (D or D∗ ) includes z in order to dominate
+another client child v 0 , other than v, while the other dominates v 0 in some other way, and
+does not include z. Nevertheless, we can prove the following weaker properties, which suffice
+for our purpose.
+lleaves
+Lemma 2.9. DC,L
+[v] ⊆ D∗,lleaves [v] ⊆ Dlleaves [v]
+
+Observation 2.10. For every v ∈ RC ,
+
+for every v ∈ R.
+
+D ∩ Ť [v] = D∗ ∩ Ť [v].
+
+Proof. The claim follows from the observation that for a cut I-tree T [v], both D and D∗
+induce optimum upmost dominating sets for Ť [v], and these induced dominating sets, D̃
+and D̃∗ , are identical by Obs. 2.7.
+We make use of the following straightforward monotonicity property.
+Observation 2.11. For every rooted tree T and two client sets S1 ⊆ S2 , the corresponding
+optimum dominating sets D1 and D2 , for (T, S1 ) and (T, S2 ) respectively, satisfy |D1 | ≤ |D2 |.
+Lemma 2.12. |Dint [v]| ≤ |D∗,int [v]| for every v ∈ RF ∪ RC .
+Lemma 2.12 and Obs. 2.8(b) imply |Dint | ≤ |D∗,int |. Combining with the first containment in Lemma 2.9,
+lleaves
+|DA | − |DFlleaves | = |Dint | + |DC,L
+| ≤ |D∗,int | + |D∗,lleaves | = |D∗ |.
+
+Denote by tf (respectively, tc ) the number of full I-trees (resp., cut I-trees) in the decomposition of T . Noting that |DFlleaves | = tf , we get that |DA | ≤ |D∗ | + tf . Since a full tree
+contains a path on which, for two consecutive vertices, at least one is in S, it is immediate
+that |D∗ [v]| ≥ (k − 1)/4 for every full I-tree T [v], and therefore |D∗ | ≥ tf · (k − 1)/4. It
+follows that the approximation ratio of the algorithm satisfies
+ρ ≤
+
+|D∗ | + tf
+tf
+tf
+|DA |
+≤
+=
++
+≤
++
+=
++
+.
+|D∗ |
+|D∗ |
+|D∗ |
+tf · (k − 1)/4
+k−1
+
+We get the following result.
+Theorem 2.13. For every positive integer k, there exists a deterministic distributed local
+approximation algorithm for CDS, with preprocessing allowed, whose online runtime on every
+n-vertex tree and every instance is at most O(k) with approximation ratio of at most 1 + k−1
+.
+2.4
+
+A CTAS for CDS on Planar Graphs
+
+2.4.1
+
+Constant Approximation for CDS on Planar Graphs
+
+The state of the art algorithm for constant round planar dominating set approximation in
+the LOCAL model achieves an approximation ratio of 20 by a recent work of Heydt et al.
+[16]. Their algorithm and analysis extend to the client dominating set problem with slight
+modifications. See Algorithm 1 for the pseudocode.
+Algorithm 1 Constant Approximation for MCDS in Planar Graphs
+1: C ← client set
+2: For every A ⊆ V (G), define NC (A) = {w | w ∈ C and (w, v) ∈ E(G) for some v ∈ A}
+3:
+NC [A] = NC (A) ∪ (A ∩ C)
+4: D1 ← {v ∈ V (G) | ∀A ⊆ V (G) \ {v}, N
+C [A] ⊇ NC (v) ⇒ |A| ≥ 4}
+5: For every
+|NC (v) ∪ NC (w)| ≥ 10
+ v ∈ V (G), compute Bv = w ∈ V (G) \ D1
+6: D2 ← v ∈ V (G) \ D1 Bv 6= ∅
+7: D3 ← C \ NC [D1 ∪ D2 ]
+8: Return D1 ∪ D2 ∪ D3
+Theorem 2.14. Algorithm 1 provides a 39-approximation for the MCDS problem in planar
+graphs.
+Proof. The proof outline is almost same as that in [16]. Let D∗ = {b1 , b2 , . . . b|D∗ | } be some
+optimal solution for a given MCDS instance. Define the set
+D̂ = {v ∈ V (G)
+
+for every A ⊆ D∗ \ {v}, NC [A] ⊇ NC (v) ⇒ |A| ≥ 4}.
+
+(1)
+
+Observe that D̂ is defined similarly to the set D1 constructed in the algorithm, except
+that V (G) is replaced with D∗ . Every element in D1 must also belong to D̂, so
+D1 ⊆ D̂
+
+(2)
+
+Lemma 2.15. |D̂ \ D∗ | < 4|D∗ |
+Proof. Suppose, for the sake of contradiction, that |D̂ \ D∗ | ≥ 4|D∗ |. Then there exists an
+independent set of size at least |D∗ | in the graph induced by D̂ \ D∗ , as every subgraph of a
+planar graph is 4-colorable. Let I = {a1 , a2 , . . . a|D∗ | } be an arbitrary such independent set.
+For every client c ∈ C, let f (c) be the smallest integer such that bf (c) dominates c.
+Let G0 be the graph obtained by contracting all edges (c, bf (c) ) in G, for every c ∈
+C \ (I ∪ D∗ ). The underlying simple graph induced by I ∪ D∗ in the graph G0 is bipartite,
+and every vertex in I has degree at least 4. Denoting the number of vertices and edges in
+this bipartite graph by n and m, respectively, we get m ≥ 4 · n2 ≥ 2n. However, every simple
+planar bipartite graph satisfies m < 2n, yielding the desired contradiction.
+Lemma 2.16. |D2 \ (D∗ ∪ D̂)| ≤ 3|D∗ |
+Proof. Consider any vertex v ∈ D2 such that v 6∈ D∗ . By definition (See Line 6 in Algorithm
+1), v 6∈ D1 , so by the definition of D1 there must exist a set of size at most 3 that dominates
+the client neighbors of v. Let Av = {y1 , y2 , y3 } be any such set for some y1 , y2 , y3 (that need
+not be distinct).
+Claim 2.17. For every v, the set Bv computed by the algorithm satisfies Bv ⊆ Av
+Proof. Suppose, for the sake of contradiction, that there exists some w 6∈ Av belonging to Bv .
+By the definition of Bv , w and v share (at least) 10 common clients, C 00 . Note that C 00 does
+not include w and v. Moreover, C 00 must also be dominated by the vertices of Av , hence at
+least one of the vertices in Av must dominate at least d10/3e = 4 of these 10 clients. Suppose
+this vertex is y1 . By the above discussions, we must have |NC (v)∩NC (w)∩NC (y1 )| ≥ 3, which
+implies the existence of K3,3 as a subgraph, contradicting the planarity of the graph.
+The v − w relation v ∈ Bw is symmetric, so we can split D2 as,
+[
+D21 =
+{v} ∪ Bv ,
+v∈D∗ \D1
+
+D22 =
+
+[
+
+{v} ∪ Bv , and
+
+v∈D̂\(D∗ ∪D1 )
+
+D23 =
+
+[
+
+{v} ∪ Bv .
+
+v6∈(D̂∪D∗ ∪D1 )
+
+Claim 2.18. D23 ⊆ D21
+Proof. Consider a vertex v 0 ∈ D23 . Then there exists some vertex v such that v 6∈ (D̂∪D∗ ∪D1 )
+and v 0 ∈ {v} ∪ B(v). Since v 6∈ D̂, by Eq. (1) there exists a set Av = {b1 , b2 , b3 } ⊆ D∗ that
+dominates NC (v). By symmetry, if bi ∈ Bv then v ∈ Bbi and therefore v and Bv are included
+in D21 , so v 0 ∈ D21 .
+Claim 2.19. D22 \ D̂ = ∅
+Proof. Suppose, for sake of contradiction, that there exists some w ∈ D22 \ D̂. There must
+exist v ∈ D̂ \ (D∗ ∪ D1 ) such that w ∈ Bv . By symmetry v ∈ Bw . As w 6∈ D̂, there exists a
+set Aw ⊆ D∗ with |Aw | ≤ 3 that dominates NC (w). From Claim 2.17, Bw ⊆ Aw ⊆ D∗ . This
+implies that v ∈ D∗ which is a contradiction.
+Finally we have D2 \ (D∗ ∪ D̂) ⊆ ∪v∈D∗ \D1 Bv and since |Bv | ≤ |Av | ≤ 3, we have
+|D2 \ (D∗ ∪ D̂)| ≤ 3|D∗ |, completing the proof of Lemma 2.16.
+Lemma 2.20. If v 6∈ D1 ∪ D2 , then |NC (v)| ≤ 30
+Proof. Suppose, for the sake of contradiction, that there is some vertex v 6∈ D1 ∪ D2 such
+that NC (v) ≥ 31. By the definition of D1 , as v 6∈ D1 , there exists a set A ⊆ V (G) \ {v}
+of size at most 3, that dominates all clients of v, and therefore at least one vertex w ∈ A
+dominates at least d31/3e = 11 clients. We must have |NC (v) ∪ NC (w)| ≥ 10 and therefore
+v ∈ D2 , leading to contradiction.
+The above lemma shows that after removing clients that are dominated by D1 ∪D2 , every
+other vertex can dominate at most 30 clients. Therefore, the set D3 constructed in the last
+step of the algorithm, which takes all the remaining undominated clients to the dominating
+set, must be at most 31 times the optimal, i.e., |D3 \ D∗ | ≤ 31. Putting the lemmas
+together, we can bound size of D = D1 ∪ D2 ∪ D3 as |D| ≤ |D∗ | + |D̂ \ D∗ | + |D \ (D̂ ∪ D∗ )| ≤
+|D∗ | + |D̂| + |D2 \ (D∗ ∪ D̂)| + |D3 \ D∗ | ≤ 39|D∗ |, proving Theorem 2.14.
+2.4.2
+
+A 1 +  approximation
+
+We adapt the distributed
+1 + -approximation scheme of Czygrinow et al. [11], whose round
+c
+complexity is O( 1 log∗ n) where c = log24/23 3. We first provide a high level overview of
+their algorithm and the major differences and difficulties towards adapting it to the recurrent
+CDS problem with preprocessing.
+Fast LOCAL Algorithm. The graph G is partitioned into several disjoint connected
+components (called clusters) such that (i) each cluster has diameter at most d, and (ii) the
+total number of edges crossing two clusters is at most E. All the cross edges are then removed
+and the dominating set problem is solved optimally and independently within each cluster.
+If the cluster diameter d is small enough, then the previous step requires only O(d) rounds,
+as the entire graph can be collected at some delegated leader who can then solve the problem
+locally. If the number of cross edges E is small enough, then we get a good approximation
+of the dominating set.
+For finding a good clustering, the algorithm first makes use of a constant approximation
+which can be obtained in constant rounds. Clustering around the dominators computed by
+the constant approximation results in clusters with diameter d ≤ 2. Each cluster is then
+contracted into a single node. Let G0 be the obtained underlying simple graph. Observe
+that G0 has at most 39|D∗ | vertices, where D∗ is the optimal client dominating set. The
+graph G0 is initially weighted with each edge having weight 1.
+Now suppose we are able to cluster G0 into connected components G01 , G02 , . . . G0s so that
+the total weight of edges crossing clusters, |Ecross |, is at most  of its initial total (which is at
+most 3 · 39|D∗ | by planarity). Let D be the union of set of dominators obtained by solving
+each graph G0i independently and optimally. We argue that D is 1 + 0 approximation. Let
+D2 be the constant approximation obtained in the first step. Consider the set D̂ = D∗ ∪ {v |
+(u, w) ∈ Ecross and v dominates w}. D̂ is a valid dominating set and moreover, D̂ ∩ V (G0i )
+dominates all clients in V [G0i ] for every i. Since D was obtained by solving G0i optimally,
+we have |D ∩ V (G0i )| ≤ |D̂ ∩ V (G0i ). Adding up over all clusters, we get |D| ≤ D̂. However
+|D̂| ≤ |D∗ | + 2 · ( · (3 · 39|D∗ |)). Plugging in we get |D| ≤ (1 + 234)|D∗ |.
+A clustering of G0 is computed by repeatedly applying a contraction process. The contraction process for a weighted graph G is as follows. A large weight subset of the edges of
+G is chosen and then oriented such that every node has out-degree at most 1. Such oriented
+graphs are called pseudo-forests. For a planar graph, it is possible to choose in one round a
+th
+pseudo-forest that has at least 61 the total weight of all edges. The pseudo forest is then
+3-colored using the Cole-Vishkin Algorithm. The 3-coloring is used to split the forest into
+disjoint stars (graphs with diameter at most 2), while not losing more than a quarter (in
+weight) of the edges of the pseudo-forest. Each star is then contracted into a single node.
+After contraction, it is possible that the graph has multiple edges. All multiple edges between a pair of nodes are replaced by a single edge whose weight is set to equal their total
+weight. The above contraction process is applied repeatedly until the weight of the edges
+of the edges, it is
+reduces to  of the initial total. Since each contraction removes at least 24
+sufficient to repeat the process t = O(log24/23  ) times.
+Let the final graph obtained be Gt . Gt provides a clustering of the original graph G, which
+can be obtained by uncontracting all the edges. The number of cross edges of the clustering
+is the weight of Gt . Each time a star is contracted, the diameter of the corresponding clusters
+increases by a multiplicative factor of at most 3 and so the diameter of each cluster given by
+Gt is O(3t ).
+The most time consuming step in this process is that of 3-coloring the pseudo-forest,
+which takes O(3i log∗ n) rounds during the ith iteration of the contraction process. The other
+t
+P
+operations take O(3i ) rounds. The total round complexity is O( 3i log∗ n) = O(3t log∗ n).
+i=0
+
+Adapting to CDS. First, we remove the edges that are not incident on any client.
+These edges do not contribute to the criteria for a set to be a dominating set, and they can
+be ignored. We then compute a constant approximation D̃ as per Algorithm 1. The initial
+clustering is obtained by choosing for each client c an arbitrary dominator of c from D̃ and
+contracting the edge between them. Additionally, every vertex that is neither a client nor
+a dominator chooses an arbitrary neighboring client and the edge between them is merged.
+The remaining steps are identical to the previous procedure.
+Speeding up using a preprocessing phase. One potential preprocessing operation
+that may improve the round complexity of the online stage might be to compute a proper 4coloring of the planar graph. Unfortunately, while a coloring of any graph remains valid after
+the removal of edges or vertices, it does not remain valid after contractions. An arbitrary
+precomputed coloring might not be of much use in coloring the contracted graphs that arise
+from repeated contractions. To accommodate contractions, we precompute a non-repetitive
+coloring of G (which is the only output of our preprocessing phase). A non-repetitive coloring
+is a coloring of the graph such that for any even length simple path, the ordered set of colors
+in the first half of the path is different from that of the second half. Non-repetitive colorings
+were first proposed by Alon et al [1]. The minimum number of colors required to realise
+a non-repetitive coloring is called the Thue number of the graph and is denoted by π(G).
+Dujmović et al. [12] showed recently that π(G) ≤ 768 for all planar graphs G.
+Suppose we have a pseudo forest F that needs to be 3-colored and suppose F is obtained
+from Gt , i.e., after t iterations of the contraction process. Let out(v) denote the other end of
+the outgoing edge of v in F . In order to 3-color the forest, it is sufficient to choose colors in
+such a way that out(v) and v have different colors, for every v. We can associate with each
+node v of Gt , a connected component (denoted Gv ) in the original graph G that contains the
+ends of all edges that were contracted to v. Choose any edge e that crosses Gv and Gout(v) .
+Construct a spanning tree of Gv and root it at the endpoint r(v) of e that lies in Gv . We now
+color v with the ordered set of non-repetitive colors traced on the unique path from r(v) to
+r(out(v)), excluding r(out(v)), in the graph Gv ∪ Gout(v) ∪ {e}. We enumerate these colors
+from 1 to 728d+1 where d is the maximum diameter of the clusters. Let the computed path be
+Pv . Observe that whenever out(out(v)) 6= v, the paths Pv and Pout(v) can be concatenated to
+form a simple path in the graph G. If Pv and Pout(v) have different lengths, then the colors
+assigned to them are different. Otherwise, by the property of a non-repetitive coloring, the
+ordered set of colors of Pv and Pout(v) must be different. When out(out(v)) = v, we have a
+2-cycle. In this case we color one of the nodes {v, out(v)} (whichever has higher id, say v)
+with its own non-repetitive color and redefine Pv = {out(v)}. Now the paths Pv and Pout(v)
+may be concatenated to obtain a simple path P . See Algorithm 2 for the pseudo-code. We
+now have a 768d+1 coloring of the pseudo-forest F , which can then be reduced to a 3-coloring
+using the Cole-Vishkin Algorithm. The complexity is O(d log∗ 768d+1 ) = O(d log∗ d). This
+leads us to our main lemma:
+Lemma 2.21. Given a clustering of the graph G, Algorithm 2 provides a 3-coloring of the
+graph obtained by contracting each cluster into a single vertex. Moreover this algorithm can
+be implemented as an O(d log∗ d) round LOCAL protocol, where d is the maximum diameter
+amongst the induced components of the clustering.
+Algorithm 2 is the main unique ingredient to our adaptation of Czygrinow et al’s algorithm. Plugging this component into their algorithm directly leads to an O (1) LOCAL
+algorithm. For concreteness, the complete clustering procedure is described in Algorithm 3
+with some minor changes to account for the clients. Once clustering is done, we proceed in
+the same way, i.e., solve the CDS problem optimally and independently within each cluster.
+Solving CDS exactly requires NP-Hard problems to be solved in the online phase, which may
+be undesirable. This can be fixed by replacing the optimal solution with a P T AS in planar
+graphs for the CDS problem by a similar adaptation of Baker’s algorithm [3].
+Theorem 2.22. For every planar graph G,
+c
+
+• Tsup (CDS , G) is O( 1 log∗ 1 ), where c = log24/23 3.
+• Realizing the above round complexity requires only O(1)(i.e. a constant independent of
+both  and G) additional bits to be stored in each node of G.
+Proof. As mentioned previously, we adapt the scheme of Czygrinow et al. The high level
+idea is to carefully cluster the graph into components with small diameter and essentially
+solve the CDS problem independently within each cluster (i.e., ignoring or removing the cross
+edges) by a brute-force manner.
+The clustering procedure is outlined in Algorithm 3. We go through the procedure and
+analyze it below.
+Phase 1: The first observation to be made is that edges with no incident client on them
+can be ignored. The existence or absence of these edges does not affect the correctness of any
+candidate solution to the CDS instance. After this removal we may get several disconnected
+components, which we can solve separately.
+In the initial clustering (Lines 1-11 of Algorithm 3), each cluster has diameter at most
+4. This is easy to see as there is a path of length at most 2 to some vertex in D? . Note
+Algorithm 2 3-coloring pseudo-forest
+1: procedure 3-color
+Input:
+(i) color : V (G) → [768], A non-repetitve coloring of the given planar graph G
+(ii) cluster : V (G) → N, describes a partitioning of the vertices of G that induce connected
+components of diameter at most d
+(iii) Gt : the graph where every cluster is contracted to a single node.
+(iv) out : V (Gt ) → V (Gt ), describes a pseudoforest in the graph Gt
+. out(v) is the
+other end of the unique outgoing edge from v
+Output: colorf : V (Gt ) → [3], a proper 3-coloring of the given pseudoforest
+2:
+for all clusters v ∈ V (Gt ) (in parallel) do
+3:
+p ← out(v), the parent of v in pseudo-forest of Gt
+4:
+Let Gv , Gp be the connected components of G that are contracted to v, p in Gt
+5:
+ev ← any edge in G that crosses Gv , Gp and rv ← the end of e in Gv
+6:
+Tv ← Any spanning tree of Gv , rooted at rv
+7:
+end for
+8:
+for all clusters v ∈ V (Gt ) (in parallel) do
+9:
+if out(p) 6= v or v < p then
+. detect cycles of length 2
+10:
+path(v) ← The unique path from rv to rp in the graph Tv ∪ Tp ∪ {e}
+11:
+else
+. Treating the case of cycle of length 2 separately
+12:
+path(v) ← {rv }
+13:
+end if
+14:
+end for
+15:
+colorf (v) ← the ordered set of colors in path(v)
+16:
+Enumerate colorf (v) using integers from 1 to 768d+1
+17:
+Reduce colorf (c) to a 3-coloring using the Cole-Vishkin Algorithm
+18:
+return colorf
+19: end procedure
+Algorithm 3 Clustering for Planar CDS
+Input: Client set C, a non-repetitive coloring of G and .
+Output: A 1 +  approximation of the optimal set dominating C.
+Phase 1: Finding a good initial clustering.
+1: Remove all edges that do not have a client incident on them.
+2: Remove isolated vertices after previous step.
+3: Compute a constant approximation D ? for C using Algorithm 1.
+4: for all nodes v ∈ V (G) \ D ? do
+5:
+if v has a neighbor in D? then
+6:
+u ← any neighbor in D?
+7:
+else
+8:
+u ← any neighbor in C or ⊥ (if such a node doesn’t exist)
+9:
+end if
+10:
+Contract the edge e = (u, v), if u exists
+11: end for
+. Done in parallel and implicitly, i.e., contracted vertices know their neighbors
+Phase 2: Improving the clustering
+12: G0 ← underlying simple graph obtained at end of Phase 1.
+13: Set wt(e) ← 1 for all e ∈ E(G0 )
+e do
+14: for all t = 0, 1, . . . dlog24/23 234
+
+15:
+out(u) ← any neighbor v such that wt((u, v)) is maximized
+16:
+H ← induced by the edges {(out(u), u) | u ∈ Gt }
+. Heavy pseudo-forest
+17:
+col ← 3-coloring of H obtained using Algorithm 2.
+18:
+for all u ∈ H with col(u) = 1 (in parallel) do
+19:
+Iu , Ou ← {(u, v) | u = out(v)}, {(u, v) | v = out(u)}
+20:
+Remove either Iu or Ou from H, whichever has smaller total weight
+21:
+end for
+22:
+for all u ∈ H with col(u) = 2 (in parallel) do
+23:
+Iu , Ou ← {(u, v) | u = out(v), col(v) = 3}, {(u, v) | v = out(u), col(v) = 3}
+24:
+Remove either Iu or Ou from H, whichever has smaller total weight
+25:
+end for
+26:
+. H now consists of connected components with diameter at most 10.
+27:
+F ← rooted spanning forest of H
+28:
+EF , OF ← edges of F at even and odd depths respectively
+29:
+Remove either EF or OF , whichever has smaller total weight
+30:
+For all edges e ∈ E(H), contract e in Gt
+31:
+Gt+1 ← underlying simple graph obtained after contractions.
+32:
+For all edges e = (u, v) ∈ Gt+1 , set wt(e) ← number of edges between u, v after all
+contractions of edges in H.
+33: end for
+34: return GT
+that Clients are directly dominated by some vertex in D? and non-clients either have a
+neighboring client adjacent to them or are isolated. Each vertex in D? is present in its own
+unique cluster.
+Phase 2: The objective of this phase is to improve the clustering in Phase 1. Let G0
+be the contracted graph obtained at the end of Phase 1. By planarity we have, |E(G0 )| ≤
+3|V (G0 )| ≤ 3 · 39|Dopt |. By definition, we have wt(G0 ) = |E(G0 )| ≤ 117|Dopt |. Here we use
+wt(G) to denote the total weight of all edges in G.
+We now describe the clustering procedure of Phase 2 (Lines 15-32). In Line 16, obtains
+a heavy-weight pseudo-forest subgraph of G0 by a simple local greedy procedure, choose an
+arbitrary incident edge with maximum weight (Line 15).
+Lemma 2.23. wt(H) ≥ 61 wt(G)
+Proof. We make use of Nash-Williams Theorem, i.e. since Gt is planar it can be decomposed into forests F1 , F2 , F3 . In each of these forests, there exists an orientation such that
+every node has out degree at most 1. Let the outgoing edge of u in the three forests be
+out1 (u), out2 (u), out3 (u) and let out(u) be the chosen outgoing edge in Line 15. WLOG, let
+F1 be theP
+forest with highest weight amongst the three. By pigeon hole principle we have,
+wt(F1 ) = u wt((out(u), u)) ≥ 31 wt(G).
+The chosen edges in Line 15-16 is done for each node independently. While for the
+forests F1 , F2 , F3 , outi (u) corresponded to a unique edge, this is not necessarily the case
+for the pseudo-forest H chosen in Line 16. In particularPwe could have out(u) = v and
+out(v) = u and therefore it is not the case that wt(H) = u wt((out(u), u)). However each
+edge (out(u), u) is counted at most twice in the summation from which we get,
+1X
+wt((out(u), u))
+wt(H) ≥
+2 u
+1X
+≥
+wt((out1 (u), u)) [By greedy choice of out(u)]
+2 u
+1
+≥ wt(F1 ) ≥ wt(Gt )
+6
+We next address Lines 18-25. This part of the algorithm breaks down the forest H into
+small diameter components. This is done in two steps. In the first step, for each node with
+color 1, either all its incoming or the unique outgoing edge is removed (whichever has smaller
+weight). The second step does the same with nodes of color 2, except it ignores edges leading
+to/ incoming from nodes with color 1. Observe that at most half the total weight of edges
+is lost in these two steps. Hence after this step we have wt(H) ≥ 12
+wt(Gt ).
+Lemma 2.24. In Line 26, every connected component in H has diameter at most 10.
+Proof. Orient every edge from u to out(u). We show that there is no directed path of length
+at least 6 in H. Because out-degree is at most 1, on any path in H, the direction of the
+edges can change at most once. Therefore this implies that diameter is at most 10.
+Suppose, for sake of contradiction, that there existed a directed path of length at least 6.
+None of the nodes in the middle of the path can have color 1, since these nodes must have
+non-zero in-degree and out-degree. There are four nodes in the middle of the path and can
+be colored either 2 or 3. By pigeon-hole principle, at least one of the nodes must have color 2
+and have non-zero in-degree and out-degree leading to nodes with color 3. This contradicts
+the fact that at least one of these edges must have been removed in Line 24.
+Lemma 2.25. In Line 30, H consists of vertex disjoint stars with weight at least 24
+wt(Gt )
+
+Proof. Since the diameter of H is 10, in O(1) rounds, we can compute a spanning forest of
+H. Subsequently either all the even depth or odd depth edges are removed, i.e. diameter of
+each connected component in H is at most 2. By the greedy choice at most 21 the weight of
+H is lost during this procedure.
+wt(Gt ). The
+We now analyze the correctness of the algorithm. We have wt(Gt+1 ) ≤ 23
+
+value of T is chosen such that wt(GT ) ≤ 234 wt(G0 ).
+Let D be the CDS solution computed independently (and optimally) on the clusters given
+by GT and let Dopt be any optimal solution to the given instance. For a node u ∈ GT , let
+Vu be the set of vertices of G0 that were contracted to u. Define Duopt = Dopt ∩ Vu and
+Du = D ∩ Vu . Let Wu be the vertices of G[Vu ] that have an incident edge of G0 leading to
+a vertex not in Vu . We have that Duopt ∪ Wu dominates all clients in G[Vu ]. Since Du is an
+optimal solution, we get,
+|Du | ≤ |Duopt ∪ Wu |
+X
+X
+|Duopt ∪ Wu |
+|Du | ≤
+⇒
+u
+
+u
+
+⇒ |D| ≤ |Dopt | + 2|E(GT )|
+⇒ |D| ≤ |Dopt | +
+|E(G0 )|
+⇒ |D| ≤ (1 + )|Dopt |
+We now analyze the round complexity. We leave it to the reader to verify that Phase 1
+can be implemented as a O(1) round distributed protocol (essentially for each line, only 1
+round of communication with neighbors is needed).
+Except Line 17, all other lines in 15-32 can be implemented as O(1) round complexity
+in the graph Gt . Let dt be the maximum diameter of a clusters given by Gt . Any LOCAL
+algorithm in Gt can be simulated by G in dt rounds (collect Gt and simulate). It is already
+shown that Line 17 takes O(dt log∗ dt ) time. Since Gt+1 is obtained by contracting stars, we
+t
+have
+t+1 ≤ 3dt + 2. This gives dt = O(3 ). The overall round complexity of Phase 2, is thus,
+Pd
+c
+T
+O( t=0 dt log∗ dt ) = O(3T log∗ 3T ) = O( 1 log∗ 1 ) where c = log24/23 3.
+3
+
+Color Completion Problems
+
+Consider a graph G(V, E) and a coloring c : V 7→ {1, . . . , k}. The vertex v is properly colored
+if each of its neighbors has a different color. The classical vertex coloring problem requires
+deciding if there exists a coloring for which all vertices are properly colored. When some
+of the vertices are already assigned a predefined coloring, the resulting recurrent problem
+is referred to as color completion (CC). We use the following measures for evaluating the
+number of colors used in any valid solution.
+• Let Ppc be the set of colors used by the precolored vertices, and denote χpc = |Ppc |.
+• Let Pun be the set of colors used for the uncolored vertices; denote χun = |Pun |.
+• Let Pnew = Pun \ Ppc be the new colors used for the uncolored vertices; denote χnew =
+|Pnew |.
+• Let Pall = Ppc ∪ Pnew be the final set of colors of all vertices; denote χall = |Pall |.
+For a given instance of CC, let χ∗un (respectively, χ∗new , χ∗all ) be the smallest possible
+value of χun (resp., χnew , χall ) over all possible proper color completions of the precoloring.
+A
+A
+Additionally, for a given algorithm A, let χA
+un (respectively, χnew , χall ) be the value of χun
+(resp., χnew , χall ) in the solution computed by A for the instance.
+The efficiency of an algorithm for CC can be measured by two parameters of interest,
+namely, χnew and χall . The difference between them becomes noticeable in instances where
+the colors in Ppc are not contiguous. We denote by CCnew (χ) (resp. CCall (χ)) the problem
+of color completion such that χnew (resp. χall ) is at most χ.
+
+3.1
+
+Single Round Color Completion
+
+We first consider what can be done when the online algorithm is restricted to a single round
+of communication.
+Theorem 3.1. Consider a graph G with maximum degree ∆ = ∆(G) and chromatic number
+χ = χ(G) with ∆ > 0. We have Tsup (CCnew (χ · ∆), G) = 1.
+Proof. The algorithm uses the color palette
+P = {(i, j) | 1 ≤ i ≤ χ, 1 ≤ j ≤ ∆}.
+In the preprocessing stage, compute a proper default coloring dc of the graph using the color
+palette P def = {i | 1 ≤ i ≤ χ}, and let each vertex v store its default color dc(v) for future
+use. These values are not used as colors in the final coloring.
+In the recurrent stage, we are given an arbitrary precoloring c(w) ∈ P for some nodes,
+and need to complete it to a proper coloring by selecting a color c(v) for each non-precolored
+node v. (It is assumed that the precoloring itself is proper, i.e., no two precolored neighboring
+vertices use the same color.)
+The algorithm requires a single round of communication. Each precolored node w informs
+its neighbors about its color c(w). Now consider a non-precolored node v. If all neighbors
+of v are colored, then v chooses a free color from the color palette. As χ · ∆ ≥ 2∆ ≥ ∆ + 1,
+such a color is guaranteed to exist.
+Otherwise, v finds a free color of the form (dc(v), j) for 1 ≤ j ≤ ∆ satisfying c(w) 6= (i, j)
+for all precolored neighbors w of v. The node v then selects c(v) ← (dc(v), j).
+By this algorithm, the color (i, j) selected by v is different from the color of any precolored
+neighbor of v. Also, (i, j) cannot be the selected color of any non-precolored neighbor w of
+v. This is because the default color dc(w) = i0 of w satisfies i0 6= i, and therefore, the selected
+color c(w) of w is of the form (i0 , k) for some k, which must differ from (i, j) at least on the
+first component. Thus, the coloring c is proper.
+Remark 3.2. In the absence of any preprocessing, Linial [17] showed that we require
+Ω(log∗ n) rounds to color the graph even if it is just a path. To complement this, Linial also
+provides an O(log∗ n) round algorithm that colors the graphs with maximum degree ∆ with
+O(∆2 ) colors.
+The algorithm works by repeatedly reducing a given proper coloring with n colors to one
+with at most d5∆2 log2 ne colors. The same algorithm can be adapted to CC with a small
+change yielding at most d23∆2 log2 ne new colors. (See Section 3.3). A consequence of the
+above is that one can readily adapt existing solutions of graph coloring to color completion.
+For example the results of Maus [18], Barenboim et al.[7] can be extended to CC, with the
+number of colors used replaced by χnew and retaining the same round complexities.
+We complement the result of Thm. 3.1 with the following lower bound.
+Theorem 3.3. For every integer χ, ∆, there exists a graph G with chromatic number χ and
+maximum degree ∆ such that for every single round deterministic distributed algorithm A,
+the total number of colors used by A over all recurrent instances of CC is at least χ·(∆−χ+2)
+even after an arbitrary preprocessing of G.
+Proof. The lower bound graph is obtained by taking the clique Kχ and and adding ∆ − χ + 1
+different nodes to each node of Kχ (See Figure 5 ). Let the vertices of the clique be v1 , v2 . . . vχ
+and let vij denote the j th neighbor of vi for each 1 ≤ i ≤ χ and 0 ≤ j ≤ ∆ − χ.
+Let A be any single round deterministic distributed algorithm that solves CC. We construct χ · (∆ − χ + 2) instances, namely Ii,j for each 1 ≤ i ≤ χ and 0 ≤ j ≤ ∆ − χ + 1 as
+follows. We define Ii,0 to be the instance where none of the nodes are precolored. Let colori,j
+be the solution to the instance Ii,j given by algorithm A. We construct Ii,j (for j > 0) from
+Ii,j−1 and colori,j−1 . Ii,j is same as the instance Ii,j−1 except that vertex vi,j−1 is precolored
+with colori,j−1 (vi ).
+We shall now argue that the following χ · (∆ − χ + 2) colors, colori,j (vi ) for 1 ≤ i ≤ χ
+and 0 ≤ j ≤ ∆ − χ + 1 are all distinct, which proves the theorem.
+Kχ
+
+∆−χ+1
+
+Figure 5: Graph whose single round color completion assigns at least χ · (∆ − χ + 1) different
+colors across all instances. In this example χ = 6, ∆ = 9.
+Consider colora,b (va ) and colorc,d (vc ) for some 1 ≤ a < c ≤ χ and 0 ≤ b, d ≤ ∆ − χ + 1. To
+argue that these colors are different, we construct a new instance I wherein va,j is precolored
+with colora,j (va ) for every 0 ≤ j < b and vb,k is precolored with colorb,k (vb ) for every 0 ≤ k < d.
+Since A operates in a single round, for node va , the instance I is indistinguishable from
+instance Ia,b . Therefore the color assigned to a by A for instance I must be colora,b (va ).
+Similarly, with respect to node vc , the instances Ic,d and I are indistinguishable and thus
+c is assigned colorc,d (vc ) by A for instance I.
+Since va , vc are directly connected and A assigns a proper coloring to G for instance I,
+and va , vc are adjacent in G, we have colora,b (va ) 6= colorc,d (vc ).
+The only pairs left to consider are of the form colora,b (va ) and colora,d (vd ) for some b < d.
+To see that these are different, consider instance Ia,d . The vertex va,b is precolored with
+colora,b (va ) and va is assigned colora,d (va ) by A. Since va , va,b are adjacent, it follows that
+colora,b (va ) 6= colora,d (va ).
+
+3.2
+
+CC with ∆1+ New Colors
+
+We now describe how the single round Color Completion can be extended for multiple rounds.
+Theorem 3.4. Consider a graph G with maximum degree ∆ = ∆(G) and chromatic number
+χ = χ(G) with ∆ > 0 and let k be any integer with 1 ≤ k ≤ χ. We have,
+χ
+Tsup (CCnew (max(d e · ∆, ∆ + 1)), G) ≤ k
+k
+Proof. The preprocessing stage is same as that of the single round algorithm, where we
+precompute a proper χ-coloring of the graph. Let dc(v) be the color of v. In the recurrent
+stage, each precolored node w sends its assigned precolor c(w) to all its neighbors during the
+first round.
+Consider the same color palette P used for the single round color completion, except
+when k = χ. In case k = χ, add another color (1, ∆ + 1) to the palette.
+During round i (1 ≤ i ≤ k), nodes v with dc(v) ≡ i (mod k) decide on their colors. If
+node v has all neighbors precolored, then it chooses any free color of the form either (i) (1, j)
+for some 1 ≤ j ≤ ∆ or (ii) (1, ∆ + 1) if χ = k and (2, 1) otherwise. If any neighbor of v
+is not precolored, then it selects any free color of the form (d dc(v)
+e, j) for some 1 ≤ j ≤ ∆.
+k
+At least one free color is guaranteed to exist as number of neighboring vertices that have
+already fixed color before round i is at most ∆ − 1. The node finalizes the chosen color as
+c(v) and if i < k, sends c(v) to all its neighbors.
+We now argue that the coloring assigned is proper. It is sufficient to show that whenever
+a node v adopts a color c(v), c(v) is different from c(w) for all neighbors w of v. We always
+choose c(v) so that it is different from the colors of all neighbors c(w) where w was colored
+at a previous round. It remains to consider those neighbors of v that are colored in the same
+round as v. Let w be an arbitrary such neighbor. We have dc(v) 6= dc(w) as dc is a proper
+e 6= d dc(w)
+e and therefore the
+coloring. Since dc(w) ≡ dc(v) (mod k), we must have d dc(v)
+k
+k
+chosen colors must be different.
+We compare Theorem 3.4 with the algorithm of Maus [18] that colors a graph using
+
+2
+O(∆1+ ) colors within ∆ 2 − 2 rounds, i.e. the algorithm uses at most c∆
+colors in k rounds
+k2
+√
+for some constant c and every k with 1 ≤ k ≤√ ∆. Comparing the number of colors, the
+.
+algorithm of Maus uses fewer colors whenever ∆ > k > c∆
+χ
+
+3.3
+
+CC Without Preprocessing
+
+The classical algorithm of Linial [17] adopts a coloring in one round with at most d5∆2 log ne
+colors. The proof is based on the existence of a family of sets that intersect at “few elements”.
+The existence of such a family of sets is shown with the help of a probabilistic argument.
+Specifically, for any given pair of integers n, ∆, there exist n sets F1 , F2 , . . . Fn , each a subset
+of [m] for some integer m ≤ d5∆2 log ne, that satisfy the following property:
+P0 :
+
+∀{i0 , i1 , i2 , . . . i∆ } ⊆ [n],
+
+F i0 \
+
+∆
+[
+
+Fij > 0.
+
+j=1
+
+The existence of these sets implies a distributed 1-round algorithm for classical
+S coloring,
+since a vertex v with a unique identifier id(v) can choose any color from Fid(v) \ u∈Γ(v) Fid(u) .
+The coloring is proper since the sets satisfy the given property and the maximum color chosen
+is m ≤ d5∆2 log ne.
+To adapt this algorithm to Color Completion, it is sufficient to modify the property
+constraint as follows:
+P∆ :
+
+∀{i0 , i1 , i2 , . . . i∆ } ⊆ [n],
+
+F i0 \
+
+∆
+[
+
+Fij > ∆.
+
+j=1
+
+Applying the same probabilistic argument, we can show the following.
+Lemma 3.5. For sufficiently large n, there exists an integer m ≤ d23∆2 log2 ne and sets
+F1 , F2 , . . . Fn ⊂ [m], that satisfy property P∆ .
+Proof. Given n and m as in the lemma, select the sets Fi randomly as follows. For each
+integer x = 1, 2, . . . m and each i = 1, 2, . . . n, add x to Fi with probability 1/∆.
+For a given set {i0 , i1 , . . . i∆ } ⊆ [n], the probability that a particular x ∈ [m] belongs to
+∆
+Fi0 but not the remaining ∆ sets is ∆1 · 1 − ∆1
+≥ 4∆
+. Hence, the probability that fewer
+than ∆ + 1 of the elements in [m] belong to Fi0 but not the remaining ∆ sets is at most
+
+ m−j−1
+P∆ m
+m
+1 m−j
+1 − 4∆
+. As long as m > 2∆, the terms are increasing, i.e., j+1
+x
+>
+j=1
+j
+ m−j
+m
+x
+. Therefore, we can bound the summation by
+j
+m−j
+m
+ 
+∆  
+X
+m
+m
+1−
+≤∆
+1−
+.
+j
+4∆
+4∆
+∆
+j=1
+
+(3)
+
+Finally, the probability that the chosen sets do not satisfy the property for at least one of
+the subsets {i0 , i1 . . . i∆ } is at most
+
+
+ 
+m
+n
+m
+1 m
+) ≤ n∆+1 · m∆ · e− 4∆ ·
+.
+(4)
+· (∆ + 1) · ∆ ·
+· (1 −
+4∆
+∆!
+∆+1
+∆
+If the final expression above is strictly less than 1, then the existence is guaranteed. This
+occurs whenever m > 4∆(∆ + 1) ln n + 4∆2 ln m. To find such a value of m, suppose
+c1 ∆2 ln n < m < c2 ∆2 ln n, then ln m < ln c2 + ln ∆2 ln n < ln c2 + 3 ln n, using which we can
+get a weaker (and easily solvable) lower bound for m,
+4∆(∆ + 1) ln n + 4∆2 ln m < 4∆(∆ + 1) ln n + 4∆2 ln c2 + 12∆2 ln n
+< 20∆2 ln n + 4∆2 ln c2
+Therefore, if we can choose c1 , c2 so that 20 + 4 lnlncn2 < c1 < c2 we are done. Considering
+ln c2
+n ≥ 3, we can choose any c2 such that c2 − (20 + 4 ln
+) exceeds 0. The smallest such value is
+around c2 = 33, therefore an upper bound on m (and also the maximum number of colors)
+is at most 33∆2 ln n ≈ 23∆2 log2 n.
+Theorem 3.6. Color Completion can be solved with χnew ≤ χall ≤ d23∆2 log2 ne colors in
+one LOCAL round.
+
+3.4
+
+CC with fewer than ∆ + 1 colors
+
+We next discuss coloring algorithms based on a preprocesing stage, which use fewer than
+∆ + 1 colors when possible.
+3.4.1
+
+A recurrent algorithm
+
+Our main result is an algorithm that, for a graph G with chromatic number χ, uses
+preprocessing, and in the recurrent stage solves any instance of CC with at most χ new
+colors in χ rounds. The algorithm operates as follows.
+Preprocessing. The preprocessing stage computes a proper-χ coloring of the graph G.
+This is stored implicitly, i.e., each node v stores a single color (a positive integer) dc(v). We
+call this coloring the initial coloring of G.
+Online algorithm. We call the algorithm the “priority recoloring” algorithm. The set
+of nodes with the same initial coloring form an independent set which implies that nodes
+belonging to this set may be colored independently. We use the standard greedy algorithm
+to simultaneously color nodes with the same initial color in a single round. The initial colors
+are only computed to partition the original set of nodes into χ independent sets.
+The input of each recurrent instance is a subset S of the nodes that were precolored, i.e.,
+each v ∈ S has a precolor c(v). For convenience, consider c(v) = 0 for all v 6∈ S. The
+required output is a color completion of the precoloring: each node v 6∈ S outputs a color
+c(v) ∈ N such that the colors assigned to all vertices form a proper coloring of the graph G.
+The online algorithm A operates as follows.
+• For r = 1, 2, . . . χ rounds, do
+– If dc(v) = r and c(v) = 0 then, c(v) ← min(N\Γ(v)), where Γ(v) = {c(w)|(w, v) ∈
+E(G)}
+For a given instance of the problem, χ∗un (respectively, χ∗new , χ∗all ) is the smallest possible
+value of χun (resp., χnew , χall ) over all possible proper color completions of the precolorA
+A
+ing, and χA
+un (respectively, χnew , χall ) is the value of χun (resp., χnew , χall ) in the solution
+computed by the priority algorithm.
+Observation 3.7. For any coloring, χall = χpc + χnew . In particular, χ∗all = χpc + χ∗new and
+A
+χA
+all = χpc + χnew .
+Lemma 3.8. χA
+new ≤ χ.
+Proof. For every integer k ≥ 1, let Nk = {1, . . . , k}. Let M = max Ppc , and let F REE =
+NM +χ \ Ppc be the set of free colors (not used in the precoloring) up to M + χ. Note that
+the cardinality of the set F REE is at least χ. Let F̂ = {f1 , . . . , fχ } consist of the smallest
+χ integers in the set F REE.
+By induction on k from 1 to χ, one can verify that during iteration k of the algorithm,
+the colors the algorithm uses for the uncolored vertices of default color dc(v) = k are taken
+A
+from F REE ∪ {f1 , . . . , fk }. Hence Pun
+⊆ Ppc ∪ F̂ , implying that χA
+new ≤ |F̂ | = χ.
+Theorem 3.9. Consider a graph G with chromatic number χ = χ(G). With preprocessing
+∗
+allowed, there exists an algorithm A that can solve an instance of CC with χA
+all ≤ χ + χall − 1
+colors and with χA
+new ≤ χ in χ units of time.
+3.4.2
+
+Hard examples and negative results
+
+A natural question is how tight these bounds are.
+Note first that the priority recoloring algorithm does not necessarily yield a good approx∗
+imation for χnew (i.e., a bound of the form χA
+new ≤ ρ · χnew for some approximation ratio ρ).
+∗
+To see this, consider the example of Fig. 6. In this example, χA
+new = 4 while χnew = 0. In
+
+Figure 6: Poor approximation for χnew . Black numbers denote the optimal coloring in the
+preprocessing stage (χ = 4). The red numbers represent the precoloring (χpc = 10). The
+green numbers are a coloring of the clique nodes that optimizes the number of new colors
+(yielding χ∗new = 0). Note that the priority algorithm will use the new colors 7, 8, 9, 10, so
+χA
+new = 4.
+this example, the problem can be attributed in part to the fact that the precoloring uses two
+non-contiguous blocks of colors, namely, {1, . . . , 6} ∪ {11, . . . , 14}. However, it is possible to
+construct an example where the priority coloring algorithm performs poorly despite the fact
+that the precoloring uses a single contiguous block of colors. Consider the graphs constructed
+recursively as shown in Figures 7 and 8.
+Initial coloring: The numbers on the graphs show the initial coloring. Note that the
+initial colors of the nodes in the cliques Kχ−2 are not specified, they must be completed so
+that they are consistent with those mentioned in the figure.
+Pre coloring: The nodes in the cliques (Kχ−2 ) are precolored with colors from 1, . . . χ−2.
+For the graph Gχ−2 , The priority recoloring algorithm uses 2χ − 2 total colors and χ − 2
+new colors, however the optimal solution uses only χ total colors and 2 new colors. The
+optimal solution can be obtained by the priority recoloring algorithm if a different initial
+coloring is chosen, in particular replace color x by color χ + 1 − x in the same graph and for
+that initial coloring the priority recoloring algorithm gives an optimal solution.
+However, combining Lemma 3.8 and Obs. 3.7 we get the following.
+Corollary 3.10. χA
+all ≤ χpc + χ.
+Since χ∗all ≥ max{χpc , χ}, we get an approximation of ratio 2 for χall .
+4
+Kχ−2
+1
+Kχ−2
+Kχ−2
+G0
+Kχ−2
+
+G1
+G2
+Figure 7: Constructing G2 from G0 , G1 (Initial coloring)
+∗
+Corollary 3.11. χA
+all ≤ 2χall .
+
+Theorem 3.12. (Lower bound for χA
+new ). For every deterministic distributed algorithm A
+∗
+that solves CC with the guarantee that χA
+new < χnew + χ, there exists a graph G such that even
+with preprocessing allowed, there exists an instance of CC for which A takes Ω(D) units of
+time, where D is the diameter of the graph G.
+Proof. Consider the graph G shown in Figure 9. The given labels to the nodes denote the
+precoloring and the none of the nodes in the clique Kχ−1 are precolored. The diameter of
+the graph is t + 2.
+Consider the set of instances where the precolors c1 , c2 , . . . cχ are chosen to be distinct
+integers from the set S = {3, 4, . . . 2χ + 2}. There are in total 2χ
+different instance precolχ
+orings.
+For any deterministic algorithm A that runs in o(t) time, the output, consisting
+of the
+
+2χ
+colors chosen by A for the nodes in the clique Kχ , must be same for each of the χ instances
+described above. Let these colors be Pun = {γ1 , γ2 , . . . γχ }. Since |S| = 2χ, |S \ Pun | ≥ χ
+which implies that there exists an instance (colors c1 , c2 , . . . chosen from S \ Pun ) such that
+Pc ∩ Pun = ∅ and consequently for that instance, χA
+new = |Pun | = χ.
+However it is optimal to color the nodes of the clique with the colors c1 , c2 . . . cχ which
+gives χ∗new = 0.
+Thus there exists an instance for which χA = χ∗new + χ.
+Note that the proof shows also that for any such algorithm A, there are some instances for
+which χ∗all = χ+2 but χA
+all = 2χ+2 and therefore there cannot exist a deterministic CTAS to
+k+2
+Kχ−2
+Kχ−2
+k+1
+Kχ−2
+G0
+
+Kχ−2
+Gk−1
+
+G1
+Gk
+
+Figure 8: Constructing Gk from G0 , G1 , . . . Gk−1 (Numbers denote Initial coloring) (a) The
+following precoloring instance is bad : color all the Kχ−2 cliques with colors from 1, 2, . . . χ−2
+and leave the rest uncolored.
+
+c1
+c2
+Kχ
+2
+t vertices
+
+cχ
+
+Figure 9: Lower bound graph for CC. Kχ denotes a clique of size χ and one node of Kχ is
+connected to the end of the path with t vertices.
+minimize χnew . Randomization also does not help. In the graph constructed above, for any
+randomized algorithm that takes o(t) rounds, the distribution of the colors assigned to the
+vertices of the clique Kχ−1 must be independent of the values of c1 , c2 , . . . cχ . Furthermore,
+there must exist a set of χ colors T , such that the probability that the algorithm chooses T
+is no more than 2χ
+. For the input where c1 , c2 , . . . cχ are chosen to be from S \ T , the same
+(χ)
+∗
+bounds for χA
+all and χall can be achieved. Therefore any algorithm that operates in o(D)
+rounds and places fewer that χ∗all + χ colors cannot succeed with probability more than 2χ
+.
+(χ)
+This implies the following.
+Corollary 3.13. There is no deterministic CTAS for the CC problem that minimizes χnew .
+Furthermore, there is no randomized CTAS that succeeds with any fixed probability.
+Another implication of Thm. 3.12 is that without preprocessing, solving CC with χA
+new <
+∗
+χnew + χ requires time Ω(D).
+Figure 10: Lower bound graph when χ = 4
+Theorem 3.14. For every integer χ ≥ 2 and deterministic algorithm A that solves P CC
+∗
+with the guarantee that χA
+new ≤ χnew + 1, there exists a graph G with chromatic number χ
+and a pre-coloring of G for which A takes χ units of time, even with arbitrary preprocessing
+allowed.
+th
+th
+Proof. Consider a series of l cliques of size χ. Let
+ vi,j be the i vertex of the j clique for
+χ
+1 ≤ i ≤ χ and 1 ≤ j ≤ l. In addition to the l · 2 edges between vertices of each clique, add
+an edge between vi,j and vi+1,k for all 1 ≤ i < l and j 6= k. In particular all pairs of edges
+between vertices of clique i and clique i + 1 are connected, except vi,j and vi+1,j . See Figure
+10 for an example with χ = 4.
+It is easy to verify that the graph has chromatic number χ. The color assignment c(vi,j ) =
+j is a proper χ-coloring.
+The diameter of the graph is l − 1 and is similar to a path with l vertices except that
+each vertex is replaced by a clique and between cliques maximum number of edges are added
+such that chromatic number of the graph remains same.
+The only way to color the graph using χ colors is to assign the vertices vi,1 , vi,2 , . . . vi,l the
+same color for every 1 ≤ i ≤ χ. Consider a precoloring where only vertices of clique 1 are
+colored. In these instances, the color of the vertices in clique l must be same regardless of the
+pre-colors assigned to vertices of clique 1. Suppose cj is the color assigned to vi,l , consider
+the precoloring instance with cpre (vi,1 ) = ci mod χ+1 (next color in cyclic order). There is no
+possible way to complete the coloring in o(D) time without using an additional color.
+Suppose the algorithm assigns color χ+1, then between any two adjacent cliques (i, i+1),
+there can be at most one j such that c(vi,j ) 6= c(vi+1,j ). Therefore at least one of the cliques
+χ + 1, χ + 2, . . . l must have a different output when the input is changed. However this
+cannot occur if the algorithm takes less than χ units of time.
+Recurrent Locally Checkable Labellings (LCL)
+
+Locally Checkable Labellings (LCL) were first proposed by Naor and Stockmeyer [20]. Informally, an LCL problem on a graph G asks for an assignment Γout of labels, to the vertices of
+G that satisfy a set of rules that are verifiable “locally”. These are problems whose solutions
+can be verified by an O(1) round distributed algorithm in the LOCAL model. Whenever the
+solution is incorrect, at least one of the nodes in the graph identifies so (not necessarily all
+of them).
+Definition 4.1 (Locally Checkable Labellings (LCL)). An LCL problem for a graph G is
+described by a 5-tuple (r, Σin , Σout , Γin , C) where
+1. Σin is a set of input labels,
+2. Γin : V (G) → Σin , is an assignment of input labels to each vertex of G
+3. Σout is a set of output labels
+4. C is a set of rules. Each element of C is a labelled centered graph H with a designated
+center w ∈ V (H), and a labelling Γ : V (H) 7→ Σin × Σout . The distance of every node
+in H from w is at most r.
+For a given vertex u ∈ V (G), let Gr (u) be the graph induced by vertices v of G that
+are at a distance at most r from u.
+A given labelling Γout : V (G) → Σout is valid if and only if for every vertex u ∈ V (G),
+there is a graph H ∈ C and an isomorphism φ : V (Gr (u)) → V (H) such that,
+• φ(u) is the designated center of H
+• (Γin (u), Γout (u)) = Γ(φ(u))
+Problems such as computing (an arbitrary) Dominating Set, Vertex Cover, Maximal
+Matching, ∆ + 1 Coloring can be represented as LCLs. The examples mentioned previously
+do not require input labels (i.e., we can construct LCL’s where every vertex has the same
+input label). Problems such as finding a client dominating set or a color completion (i.e.,
+variants of the classical problems with PFO or PCS instances) can also be captured by the
+above definition, however they crucially require input labels, i.e. |Σin | > 1 for these LCL’s.
+To realise the Client Dominating Set as an LCL, consider Σin to be {client, non-client}
+and Σout = {server, non-server}. The input labelling Γin , assigns the input labels accordingly
+as per the client set C given by the CDS instance. The set of rules C consists of all centered
+graphs with radius 1 and degree at most ∆(G) wherein one of the following holds: (i) the
+center is labelled a server, (ii) one of the neighbors of the center is labelled as a server or
+(iii) the center has input label non-client. Restricting Σin = {client} captures the classical
+Dominating Set problem. Note that LCL’s are often not optimisation problems, i.e. we often
+can’t minimize/maximize any set of labels as such problems are often not locally verifiable.
+
+4.1
+
+Subgraph LCL’s without Input Labels on Paths
+
+In this section we consider a subset of recurrent LCL’s, named subgraph LCL’s without input
+labels, which were studied by Foerster et al. [13]. In subgraph LCL’s, the online instances
+ask for a valid labelling for some (edge induced) subgraph of the given graph G. This class
+of LCL’s is easier to solve, but already captures several classical problems, such as finding a
+dominating set, maximal matching, maximal independent set, (k, l)-ruling sets etc.
+We consider subgraph LCL on a path Pn . Before getting to the solution, we first remark
+that one may consider without loss of generality only LCL’s with radius 1. Given an LCL
+problem of radius r, one may construct an equivalent LCL with radius 1 at the cost of
+increasing the output label size and the set of rules.
+From a prior work (Theorem 3 in Foerster et al. [9]), we may infer that if the round
+complexity of Π in the LOCAL model is o(n), then it must be O(1) in the SUPPORTED
+model. This result is non-constructive, i.e., it argues that given a o(n) round distributed
+algorithm, one can transform it into an O(1) round algorithm. Additionally, it does not help
+categorize LCL problems that are Θ(n) in the LOCAL model. Some LCL problems (such as
+2-coloring) are Θ(n) in the LOCAL model, but clearly O(1) in the SUPPORTED model. One
+can also construct LCL’s that remain Θ(n) in the SUPPORTED model. Furthermore, the
+proof offers no insight about the additional amount of memory per node that is needed for
+the preprocessing stage. The following theorem addresses the above questions. Note that
+as done in prior work, we treat the size of the description of Π as constant in the round
+complexity (in particular, |Σout | and |Σin | are constants).
+Theorem 4.2. Let Π be a subgraph LCL with |Σin | = 1 and let Pn be a path on n vertices,
+then
+• Tsup (Π, Pn ) is either Θ(1) or Θ(n)
+• Ssup (Π, Pn ) is O(1)
+• Tsup (Π, Pn ) and an optimal solution for Π can be found in time polynomial in size of
+Π by a centralized algorithm.
+Proof. As remarked earlier, we may assume that the radius r for the LCL problem is 1.
+Therefore, on a path we can represent C as consisting of centered paths of length 1, 2 or 3,
+whose (ordered) label sets form a subset of Σout ∪ Σ2out ∪ Σ3out (recall that |Σin | = 1 and can
+be ignored). Note that the tuples in C are ordered, in particular (a, b) is different from (b, a).
+For tuples of length 2, we assume the first element is the label of the center and for tuples of
+size 3, we assume that the middle element is the center. For example, (a, b) ∈ C represents
+a path of length 2 with the center labeled a. Similarly (a, b, c) represents a path of length 3
+with the center labelled b and the endpoint vertices labelled a and c.
+Construct a directed graph Gd defined as follows. Its vertex set is V (Gd ) = Σ2out , and
+E(Gd ) contains a directed edge from (a, b) to (b, c) if and only if (a, b, c) ∈ C. Define the
+starting and terminal vertices of Gd as
+S = {(a, b) ∈ Σ2out | (a, b) ∈ C},
+T = {(a, b) ∈ Σ2out | (b, a) ∈ C}.
+The key observation underlying our proof is that finding a solution to the LCL problem
+on a path of length n is equivalent to finding a walk in Gd of length n that begins at a
+starting vertex and ends at a terminal vertex.
+Claim 4.3. For every path Pn with n ≥ 3, an assignment of output labels (s0 , s1 , . . . sn−1 )
+is valid if and only if (s0 , s1 ), (s1 , s2 ) . . . (sn−2 , sn−1 ) is a walk in Gd that begins at a starting
+vertex in S and ends at a terminal vertex in T .
+Proof. (⇒) By correctness of the solution we must have (s0 , s1 ), (sn−1 , sn−2 ) ∈ C. By definition, (s0 , s1 ) ∈ S and (sn−2 , sn−1 ) ∈ T .
+By correctness of the LCL we have, (si−1 , si , si+1 ) ∈ C and therefore there exists an edge
+between (si−1 , si ) and (si , si+1 ) for every 1 < i < n − 1. Hence the given sequence represents
+a walk in Gd .
+(⇐) As starting and terminal vertices are in S and T , respectively, we have (s0 , s1 ) ∈ C
+and (sn−1 , sn−2 ) ∈ C. Therefore the rules are satisfied for the ends of the path. For the
+intermediate vertices we have that there is an edge from (si−1 , si ) to (si , si+1 ) for every
+1 < i < n − 1, and therefore (si−1 , si , si+1 ) ∈ C. Hence the sequence is a valid assignment of
+labels.
+Definition 4.4 (walkspan). Given a directed graph Gd and two vertices u, w ∈ V (Gd ),
+define walkspan(u, w) as the set of lengths of walks in Gd that start at u and end at w. We
+extend
+the definition to subsets U, W ⊆ V (Gd ) in the natural way, i.e., walkspan(U, W ) =
+S
+u∈U,w∈W walkspan(u, w).
+Let α = |Σout |2 . For a set of integers S and a positive integer k, let S/k = {j (mod k) |
+j ∈ S}.
+Lemma 4.5. If Tsup (Π, Pn ) = o(n) then Gd contains a cycle C and a vertex v ∈ C such
+that
+walkspan(S, v)/|C| = walkspan(v, T )/|C| = {0, 1, . . . |C| − 1}.
+(5)
+Proof. Let A be any distributed algorithm for the online phase that solves Π in o(n) (recall
+that A can use any information obtained out of an arbitrary preprocessing phase). Let the
+given path be Pn = (v1 , v2 , . . . vn ), ordered from its left end to its right end. We assume
+n > 6α. Consider the subpath Q = (vn/2−α/2 , ..., vn/2+α/2+1 ) i.e., a path of length at least
+α + 1, around the center of P . Now construct α instances for the online phase, namely,
+I1 , I2 , . . . Iα , where Ii = (vi , vi+1 , . . . vn−i+1 ) for 1 ≤ i ≤ α, namely, each Ii is obtained from
+Pn by removing the i − 1 first and last vertices.
+Note that since n > 6α, the first (respectively, last) vertex of Q is at distance Ω(n)
+from vα (resp., vn−α+1 ). Hence, each of the instances Ii fully contains the subpath Q, and
+moreover, its start segment (from vi to the first vertex of Q) and end segment (from the
+last vertex of Q to vn−i+1 ) are of length Ω(n). This implies that during the execution of
+the online algorithm on any given recurrent instance Ii , the vertices in Q cannot distinguish
+between any of the instances constructed above (i.e., they will see exactly the same inputs,
+and consequently perform exactly the same steps, on each of these instances). Consequently,
+for every vertex vj in Q, the output of A is the same for every instance Ii . Let the output
+be ψ̄ = (s0 , s1 , . . . sn−1 ).
+As |Q| > α, there exists a subpath of Q, say Q̄, whose assigned labels st , st+1 , . . . sj−1 , sj
+form a simple cycle, i.e., such that sj−1 = st and sj = st+1 . By the correctness of these
+labels, we have that (st , st+1 ), (st+1 , st+2 ) . . . (sj−1 , sj ) is a cycle in Gd . Denote this cycle by
+C and let the first vertex of Q̄ be v` . We show that C and (st , st+1 ) are the desired cycle
+and vertex satisfying the properties of the lemma.
+Note that in all the instances I1 , I2 , . . . Iα , the labels of the vertices v` , v`+1 assigned by A
+remain the same (i.e., st , st+1 respectively). Consider instance Ii = (vi , vi+1 , . . . vn−i+1 ). Let
+the assigned labels by A to this path be ψ = (s01 , s02 , . . . s0`−i+1 , s0`−i+2 . . . s0n−i+1 ). We have
+s0`−i+1 = st and s0`−i+2 = st+1 (Here s0`−i+1 , s0`−i+2 are the labels of v` , v`+1 respectively). Note
+that ψ is valid. Therefore, by Claim 4.3, (s01 , s02 ) ∈ S and (s01 , s02 ), (s02 , s03 ), . . . (s0`−i+1 , s0`−i+2 ) is
+a walk of length `−i+1 in Gd that ends at (s0`−i+1 , s0`−i+2 ) = (st , st+1 ). It follows that for every
+i = 1, 2, . . . α, there exists a walk that (i) starts from some vertex in S, (ii) ends at vertex
+(st , st+1 ) and (iii) is of length ` − i + 1. We have shown that walkspan(S, (st , st+1 )) contains
+α ≥ |C| contiguous integers and hence walkspan(S, (st , st+1 ))/|C| = {0, 1, . . . |C| − 1}. By a
+symmetric argument we can show that walkspan((si , st+1 ), T )/|C| = {0, 1, . . . |C| − 1}.
+Lemma 4.6. If Gd contains a cycle C and a vertex v ∈ C that satisfies Equation (5), then
+Π is solvable in O(α2 ) = O(|Σ|4 ) rounds in the SUPPORTED model.
+Proof. We first compute the shortest length walks of each congruence class in walkspan(S, v)
+and walkspan(v, T ) modulo |C|. We show that the shortest such walk has length at most
+2α2 .
+Consider any walk W = (w0 , w1 , . . . ) in Gd . Decompose the walk into an alternating
+sequence of simple paths and cycles, i.e., W = P0 ◦ C0 ◦ P1 ◦ C1 . . . . Such a decomposition
+can be obtained by finding the smallest prefix of the walk that contains a simple cycle, say
+P0 ◦ W0 . Remove the vertices of P0 ◦ W0 except the last vertex, and repeat recursively for
+the remaining part of the walk. We would like to shorten the walk W , while maintaining
+two invariants: (i) the remainder |W | (mod |C|) obtained when the length of the walk is
+divided by |C|, and (ii) the fact that W starts at a vertex from S and ends at a vertex in T .
+We first observe that removing cycles in the walk does not affect invariant (ii). To achieve
+(i) we use the following well known number-theoretic fact.
+Proposition 4.7. For any sequence of n (not necessarily distinct) integers a1 , a2 , . . . an ,
+there exists a subset of these integers whose sum is divisible by n.
+Proof. Define si = (a1 + a2 + · · · + ai ) (mod n) for i = 1, 2, . . . n and define s0 = 0. By
+the pigeon-hole principle, there exist 0 ≤ i < j ≤ n such that si = sj . The desired set is
+{ai+1 , ai+2 , . . . , aj }.
+Apply the following shortening process to W . While there are at least |C| cycles in the
+walk decomposition, choose any subset of the cycles whose total length is divisible by |C|
+and remove them. At the end of this process, we are left with a sequence of simple paths
+and cycles with at most |C| − 1 < α cycles and at most |C| ≤ α paths. Each simple cycle
+and path contains at most α vertices and therefore the length of the final shortened walk W
+is at most 2α2 .
+We are now ready to describe the distributed recurrent algorithm for the solving Π,
+consisting of a preprocessing stage and an online procedure.
+Ps
+
+L3
+
+s1 s2 s3 s1 s2 s3 s1 s2 s3
+
+R3
+s1 s2 s3 s1 s2 s3 s1 s2 s3
+u5 u4 u3 u2 u1
+
+t1 t2 t3 t4 t5
+
+Figure 11: Given path Pn decomposed into blocks of size k = 3. A subpath Ps chosen for
+some online instance. Labels si are obtained from the cycle C of the corresponding graph
+Gd .
+Preprocessing Stage. In the preprocessing phase, we first compute a candidate cycle
+and vertex pair C, v satisfying Equation (5). Since Π is global knowledge, C, v can be
+reconstructed by each node in the online stage, as long as they use the same deterministic
+algorithm to find it. We only require the length of the cycle, |C|. Split the path into blocks
+of size exactly |C|, except possibly the last block. Color each node using two colors 0, 1 such
+that two adjacent nodes have the same color if and only if they belong to the same block.
+Let this coloring be ψ. In addition to the above decomposition, we also orient the edges such
+that every node has outdegree at most 1. This gives a consistent left to right orientation to
+the nodes of the path. We require only 1 bit to be stored in each node, namely which of its
+neighbors has the outgoing edge. In total we have only two bits of information given to each
+node during the preprocessing stage, one bit for orientation and another bit for the block
+decomposition.
+Online Stage. Each node computes a candidate C, v that satisfies Equation (5) using
+the same deterministic algorithm. We also compute the shortest length walks L1 , L2 , . . . L|C|
+from a vertex in S to v and the walks R1 , R2 . . . R|C| from v to a vertex in T such that
+|Li | ≡ |Ri | ≡ i (mod |C|). We discuss later how all of the above information can be obtained
+by centralized algorithms that run in time polynomial in |Σin | (This bound does not affect
+round complexity, but shows that nodes only perform computation that is polynomial in
+|Σin |).
+Let I be the online instance which is a set of subpaths of the path P . We solve each
+subpath independently. Let Ps be a subpath in I. We may assume that Ps has at least
+α2 + 2α nodes, otherwise the instance can be solved by a single node that collects subpath
+Ps .
+Decompose the subpath Ps into blocks by removing edges whose ends (say u, v) have
+different colors (ψ(u) 6= ψ(v)). This decomposes Ps into blocks of size exactly k = |C|,
+except possibly the first and last blocks (i.e. those containing the ends of the subpath).
+Each block is also oriented from left to right (using the orientation remembered from the
+preprocessing phase). Let the labels of the cycle C be (s1 , s2 ), (s2 , s3 ) . . . (sk , s1 ), (s1 , s2 ) with
+(s1 , s2 ) denoting the vertex v. Label the ith vertex of the block (numbered from left) with si .
+This is already “almost” a valid labelling for Ps , because except for a ends of the subpath Ps ,
+all nodes see a graph from C in their local 1-neighborhood. Let the number of vertices in the
+first and last blocks of Ps be a0 , b0 respectively and let a, b be integers such that 1 ≤ a, b, ≤ k
+and a ≡ a0 + 1 (mod k), b ≡ b0 − 1 (mod k). La = {(t1 , t2 )(t2 , t3 ) . . . (t|La |−1 , s1 )(s1 , s2 )}.
+Replace the labels of the first |La | − 1 nodes of Ps with t1 , t2 , . . . t|La |−1 . Similarly replace
+the labels of the last |Rb | − 1 vertices with the labels obtained from the walk Rb . Both can
+be done distributively in |La | + |Rb | = O(α2 ) rounds by having the ends of the subpath Ps
+relay this information to the nodes. As the length of the path is at least 4α2 + 2α, the first
+|La | − 1 and last |Rb | − 1 vertices of subpath Ps are disjoint. The resulting labelling traces a
+walk in Gd from a vertex in S to a vertex in T and by Claim 4.3 is a valid labelling for the
+LCL Π.
+Figure 11 shows an example of an LCL whose cycle, C = {(s1 , s2 ), (s2 , s3 ), (s3 , s1 )},
+contains three vertices. The online subpath Ps is such that the precomputed block decomposition decomposes the first and last blocks into sizes a0 = 2, b0 = 1 respectively.
+We have a = 3, b = 3 to be the desired walk lengths. In this example L3 , R3 both are
+walks on 6 vertices. L3 = {(t1 , t2 ), (t2 , t3 ), . . . (t5 , s1 ), (s1 , s2 )}. Similarly R3 is the walk
+{(s1 , s2 ), (s2 , u5 ), (u5 , u4 ) . . . (u2 , u1 )}.
+We conclude with justifying the algorithm and its time complexity analysis. First, notice
+that we do not need to precompute the cycle C in the preprocessing stage. Given the
+description of Π, we can verify in the online execution if there exists a cycle C and vertex
+v satisfying Equation (5). This can be done in a single round (in which the number of
+computational steps performed locally at each vertex is polynomial in |Σin |), as C has α =
+|Σ|2 vertices. To compute (online) the desired walks (or establish that they do not exist),
+note that we only need to consider walks of length at most α2 = |Σ|4 . Consider the graph
+Gw with vertices (u, j) for u ∈ Gd and 0 ≤ j < α2 . Draw an edge from (u1 , j) to (u2 , j + 1)
+if there exists an edge (u1 , u2 ) in Gd . Add a vertex src to the graph and an edge from src to
+(u1 , 0) if u1 ∈ S. Determining if there exists a walk in the graph from a vertex in S to v of
+length j is equivalent to finding a path in Gw from src to (v, j).
+Finally to test if a cycle of length c exists, find the smallest j ≤ α such that (i) there
+exists a walk from S to v and v to T of length 0, 1, . . . j − 1 (mod j), and (ii) there exists
+a walk from v to v of length j. This can again be determined in a single round, spending a
+polynomial number of computation steps locally at each vertex.
+We have thus shown that Tsup (Π, Pn ) is either Θ(1) or Θ(n), and Ssup (Π, Pn ) = O(1), i.e.,
+to achieve optimal round complexity, it is sufficient to remember O(1) bits. Precomputing
+more information does not help to reduce round complexity of this particular problem.
+Remark. The bound O(|Σ|4 ) on the round complexity cannot be improved further in
+general, i.e., there are LCL’s that require these many rounds. We construct them by first
+constructing the graph Gd . Consider the graph Gd which consists of two directed cycles
+that share exactly one common vertex and both cycles have length Ω(|Σ|2 ) and are prime.
+Exactly one vertex is contained in S and this vertex is also in T and this vertex is NOT the
+common vertex of the two cycles. In order to realise all congruence classes, we need a walk
+of size at least p1 p2 − max(p1 , p2 ) which is Ω(|Σ|4 ).
+4.2
+
+Recurrent LCL’s on Paths
+
+In this section we look at a broader class of recurrent in-labeled LCL’s, namely, LCL’s
+augmented with input labels, wherein the online instances specify different input labels.
+The set of rules C and the set of output labels Σout remain the same across instances. The
+only components of the input that vary across instances are the input labels Γin . Subgraph
+LCL’s, studied in Sect. 4.1, can be represented in this framework by encoding the adjacent
+edges that are present in the input labels for each vertex, hence in-labeled LCL’s are a
+generalisation of subgraph LCL’s. Problems such as finding a Client Dominating Set, Color
+Completion, Maximal Matching and in general variants of classical local problems with PFO
+and / or PCS fall into this category.
+We show that even for these instances, finding the optimal round complexity is either Θ(1)
+or Θ(n), thus extending the distributed speed up theorem in Foerster et al. [13]. However,
+so far we were unable to find a characterization as obtained in the previous subsection.
+Therefore, we are left with a couple of intriguing open questions. First, we do not know
+any bounds on the constant of the running time in terms of the size of the LCL Π, namely,
+|Σin | + |Σout |. Second, we do not know if it is possible to decide the online round complexity
+in polynomial time given the description of the LCL.
+Theorem 4.8. Let Π be a recurrent LCL problem whose online instances differ only in the
+assignment of input labels. Then Tsup (Π, Pn ) is either Θ(1) or Θ(n) and Ssup (Π, Pn ) = O(1).
+Proof. Suppose Tsup (Π, Pn ) = T (n) = o(n). Let A(n) be the online algorithm and denote
+the information obtained during the preprocessing phase for a path of length n by Inf pre (n).
+Using A(n) and Inf pre (n), we design a modified preprocessing phase, yielding the information Inf 0pre (n), and a modified online algorithm A0 (n) with improved online round complexity.
+Since T (n) = o(n), there must exist a constant n0 such that 4T (n0 ) < n0 . We only
+describe the procedure for paths whose lengths are more than 2n0 . The remaining cases can
+be identified and dealt with separately.
+Let the path be Pn = (u1 , u2 , . . . un ), numbered from left to right for n > 2n0 . Let
+Inf pre (n, i) be the output given to ui (i.e., the vertex at distance i − 1 from the beginning
+of Pn ). Let P̃i be a subpath of Pn of length n0 , that contains ui and as many vertices as
+possible that are at a distance at most n0 /2 or fewer. More formally suppose ui is in the
+left half of the path, then construct P̃i by taking min(n0 /2, i) vertices to the left of ui and
+as many vertices to the right of ui until its length becomes n0 .
+Preprocessing Stage. Define Inf 0pre (n, ui ) = Inf pre (a, b)||{i (mod n0 )}, where || denotes
+concatenation. That is, in addition to Inf pre (a, b) we also precompute the distance of ui from
+the left end of the path (modulo n0 ). Observe that i (mod n0 ) provides a labelling of the
+vertices such that no two nodes within a distance of n0 have the same label.
+Online Stage. Label the vertices of the path such that no label repeats within a distance
+n0 . This labelling was already computed in the preprocessing phase, by computing the
+distance of the vertices modulo n0 . Define the modified online algorithm as A0 (n) = A(n0 ),
+i.e. vertices ui simply execute A pretending they are in the path P̃i and have labels i
+(mod n0 ).
+To verify correctness, recall that 4T (n0 ) < n0 , and therefore, when a vertex u executes A0
+and assumes a label σ, it has enough information within its locality to determine label σ 0 of
+every node within a distance of T (n0 ), as all these vertices communicate only with vertices
+at a distance of 2T (n0 ) from u. Suppose v is at distance at most T (n0 ) from u. The inputs
+that v sees within its neighborhood in the path P̃v are identical to the inputs that it sees in
+the path P̃u , and so the two executions must be the same. Since P̃u is labelled correctly for
+all u, the path Pn must also be correctly labelled.
+Finally note that the round complexity of A0 is T 0 (n) = T (n0 ), which is clearly constant,
+and the total space used per vertex is also a function of only n0 = O(1), so Ssup (Π, Pn ) =
+O(1).
+The proof of the above theorem is almost the same as that of Theorem 6 in [9] (for the
+LOCAL model) and Theorem 3 in [13] (for the SUPPORTED model). Note that the above
+theorem is stronger than Theorem 3 of [13], which only translates o(n) time algorithms in
+LOCAL to O(1) time algorithms in SUPPORTED, whereas our argument also translates o(n)
+time algorithms in SUPPORTED to O(1) time algorithms in SUPPORTED.
+Maximal Matching and Maximal Independent Set
+
+In this section we explore some results on the sub-graph maximal matching and sub-graph
+maximal independent set problems. By sub-graph maximal matching, we mean a recurrent
+problem wherein the online instances are simply sub-graphs of the original graph. Similarly
+for sub-graph MIS. The removed edges can still be used for communication.
+
+5.1
+
+Maximal Matching
+
+We look at trees and bounded arboricity graphs. Balliu et al. [4] showed that in the
+LOCAL model, computing a maximal matching for ∆ regular trees deterministically (or with
+probability at least 1 − ∆1∆ ) requires Ω(∆) rounds whenever ∆ >> log n. This lower bound
+trivially extends to the sub-graph maximal matching problem in the LOCAL model.
+In this section we show that for bounded arboricity graphs, maximal matching can be
+solved in O(a) rounds where a is the arboricity. In particular for trees, this gives an O(1)
+round algorithm. We note that this already indicates some separation for the general subgraph maximal matching problem.
+Theorem 5.1. Sub-graph Maximal Matching on trees can be done in O(1) rounds in the
+SUPPORTED model.
+Proof. Preprocessing Stage. Root the tree at an arbitrary vertex and calculate depth of
+every vertex modulo 2, denote this by depth(v) for vertex v.
+Online Stage. We deal with vertices v that have the same depth(v) simultaneously.
+During phase j (for j = 0, 1), vertices v with depth(v) = j and that are not yet matched,
+send a request to their parent (if there exists an edge from v to its parent in the online stage).
+Among every vertex p with depth(p) = j − 1 (mod 2) that has received a request, p chooses
+an arbitrary (perhaps one with smallest id) and adds the edge to the maximal matching and
+removes all incident edges from the graph. When a node v receives an acceptance, it removes
+all incident edges from the graph (for the next phase).
+Correctness. When an edge is added to the matching (say (v, p)), let u be an arbitrary
+child of v, and q be the parent of p. Because depth(p) 6= depth(v), (p, w) will not be added
+to the matching in this round. Similarly the edge (u, v) will not be added. So all edges
+added to the matching in a phase do not violate the constraints for a valid matching.
+At the end of two phases, consider an edge (v, p) that is not part of the matching, where
+p is the parent of v. The reason that edge (v, p) did not get added to the matching was that
+when v sent a request to p to add an edge, either p accepted another request or p was already
+matched. In either case, there exists an edge incident on p that is part of the matching, and
+hence (v, p) cannot be added to the matching.
+Round Complexity. Each phase takes 3 rounds (one to send the request, one to
+receive its acceptance into the matching and one to notify neighbors and remove edges from
+the graph) and there are only 2 phases.
+Theorem 5.2. Sub-graph Maximal Matching on graphs of arboricity a can be computed in
+O(a) LOCAL rounds in the SUPPORTED model.
+Proof. We use the algorithm of Theorem 5.1.
+Preprocessing Stage. Compute a forest decomposition of the edge set of the graph.
+Invoke preprocessing stage of proof of Theorem 5.1.
+Remark. Computing optimal forest decomposition is NP-hard, however one can obtain
+a forest decomposition into 2a forests in polynomial time, so the preprocessing can be made
+efficient at the expense of only a constant factor in round complexity.
+Online Stage. We compute maximal matching of the subgraph induced by each forest
+simultaneously. In phase j (for j = 1, 2, . . . a), execute sub-graph maximal matching for
+the j th forest in the decomposition, using the online stage of proof of Theorem 5.1. Before
+proceeding to the next phase, for every vertex v which got a new incident edge added to the
+matching, remove all its incident edges from the graph.
+
+5.2
+
+Bipartite graphs are the hardest instances to breach the ∆
+barrier
+
+Towards finding optimal algorithms for sub-graph Maximal Matching, we show the following
+lemma.
+Lemma 5.3. If subgraph MM can be solved in o(∆) for all bipartite graphs, then subgraphMM can be solved in o(∆) for all graphs.
+∆
+Proof. Suppose subgraph-MM for bipartite graphs can be solved in O( f (∆)
+) rounds for some
+function f (∆) that is ω(1). Note that MM can be solved in O(∆) rounds in the SUPPORTED
+model (compute O(∆) edge coloring and then compute MIS using said coloring as per Theorem 5.5). We make use of the following well known proposition.
+Proposition 5.4. For every integer d with 1 ≤ d ≤ ∆, there exists a partition of the vertex
+set of G into d disjoint sets, V1 , V2 , . . . Vd such that ∆(G[Vi ]) ≤ ∆(G)/d.
+Proof. Let d be an integer with 1 ≤ d ≤ ∆. For a partition P of the vertex set into
+V1 , V2 , . . . Vd , let degP (v) bePthe degree of the vertex v in G[Vi ] where v ∈ Vi . Consider a
+partition P that minimizes v∈G degP (v). We claim that P is the desired partition. Suppose
+for contradiction that there exists v ∈ G with degP (v) > ∆/k. As total degree is at most ∆,
+there exists j such that VjP
+contains strictly less than ∆/k neighbors of v. Moving v from Vi
+to Vj , results in reducing
+degP (v) by at least 2 which contradicts the choice of P .
+v∈G
+
+Preprocessing Stage. Compute the partition of V (G) into V1 , V2 , . . . Vd for some 2 ≤
+d ≤ ∆. (For now the algorithm is parameterised by d, we shall find a suitable value for it
+later).
+Online Stage. First we compute in parallel a MM for each G[Vi ], by the linear in ∆
+algorithm described earlier. Subsequently matched vertices are removed. We then execute
+d phases. In phase i, consider the bipartite graph induced by 
+the cut
+ Vi , V \ Vi . Compute
+∆
+MM of this cut after removing the matched vertices in time O f (∆) and then remove the
+matched vertices.
+The total round complexity is given by,
+T (∆) ≤
+Choosing d =
+
+∆
+∆
++d
+d
+f (∆)
+
+p
+f (∆) we get T (∆) ≤ √ ∆
+
+f (∆)
+
+which is o(∆).
+
+We propose that the above lemma presents a strong case to study the problem on bipartite
+graphs.
+
+5.3
+
+Maximal Independent Set
+
+In this section we show that sub-graph maximal matching can be solved in O(χ(G)) rounds
+in SUPPORTED, where χ(G) is the chromatic number of the graph G. We also show how
+to extend the underlying idea behind this algorithm for other graph families with “nice”
+vertex decompositions. This extension partly explains the working of the maximal matching
+algorithm for bounded arboricity graphs (Theorem 5.1).
+Theorem 5.5. Sub-graph MIS for a graph G with chromatic number χ can be solved in χ
+rounds.
+Proof. Preprocessing Stage. Compute a proper χ coloring of the graph.
+Online Stage. In phase i (for i = 1, 2, . . . χ), vertices with color i add themselves to the
+independent set if none of its neighbors have been added. Once a vertex adds itself to the
+independent set, it informs all of its neighbors.
+A well known technique of finding a maximal matching (MM) of a graph G is to find a
+maximal independent set (MIS) of its line graph L(G). Since ∆(L(G)) ≤ 2∆(G) − 2, a o(∆)
+algorithm for MIS implies a o(∆) algorithm for MM.
+There exists an O(∆ + log∗ n) algorithm for MM in general graphs (after coloring the
+graph using ∆ + 1 colors, use Theorem 5.5, note that ∆ + 1 coloring (i.e. the preprocessing
+stage) can be done in o(∆) + log∗ n rounds).
+Lemma 5.6. Suppose sub-graph MIS can be solved for a graph family F in T rounds, and
+suppose the vertex set of a graph G can be covered by k sets V1 , V2 , . . . Vk (i.e. ∪Vi = V (G))
+such that G[Vk ] ∈ F, then sub-graph MIS for G can be solved in T · k + (k − 1) rounds in the
+SUPPORTED model.
+Proof. The above lemma is in some sense a generalization of Theorem 5.5. Applying F to
+be the set of all graphs with 0 edges and observing that MIS can be solved trivially in T = 0
+rounds of communication. Chromatic number χ implies that its vertex set can be partitioned
+into χ sets each of which is independent. Moving on to the proof (which is in spirit same as
+that of Theorem 5.5)
+Preprocessing Stage. Decompose G into V1 , V2 , . . . Vk
+Online Stage. The algorithm runs in several phases. In each phase the independent
+set computed so far is extended. Let Ii be the independent set computing during phase i
+(I0 = ∅). In phase i, compute the MIS for the subgraph G[Vi \ Ii−1 ]. Note that G[Vi \ Ii−1 ]
+is a subgraph of G[Vi ] and by the lemma, MIS can be computed in T rounds.
+Let I˜i be the independent set of G[Vi \ Ii−1 ]. Observe that Ii = Ii−1 ∪ I˜i is an independent
+set of G.
+Finally consider Ik . Suppose Ik was not an MIS, then there exists a vertex v 6∈ Ik such
+that none of the neighbors of v lie in Ik . Suppose v ∈ Vi , then consider H = G[Vi \ Ii−1 ].
+We know v 6∈ Ii−1 so v ∈ H. Also v 6∈ I˜i , the MIS of H. Consider J = I˜i ∪ {v}. J is an
+independent set of H, since none of the neighbors of v lie in I. This contradicts that I˜i is
+an MIS of H.
+One can also view the results for MM (Theorems 5.1, 5.2) as a consequence of the above
+lemma. MM for a tree (say T ) is identical to the MIS for its line graph. Observe that MIS is
+trivial for graphs G where each of connected component of G is a clique (vertex v belongs to
+MIS iff it has least ID among its neighbors). Let this family of graphs be F. Root the tree T
+at an arbitrary vertex and let E0 , E1 be the set of edges at even and odd depths respectively.
+The line graph induced by E0 (i.e. L(T )[E0 ]) belongs to F. Similarly for bounded arboricity
+graphs, we can decompose them into a forests and in turn into 2a members of F.
+
+Acknowledgement
+David Peleg holds the Venky Harinarayanan and Anand Rajaraman (VHAR) Visiting Chair
+Professorship at IIT Madras. This work was carried out in part during mutual visits that were
+supported by the VHAR Visiting Chair funds. John Augustine and Srikkanth Ramachandran
+are supported by the Centre of Excellence in Cryptography, Cybersecurity, and Distributed
+Trust (CCD) and by an IITM-Accenture project (SB/22-23/007/JOHN/ACC).

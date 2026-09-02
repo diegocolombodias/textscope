@@ -1,0 +1,1169 @@
+Anticipation of Method Execution in Mixed Consistency Systems
+– Technical Report
+Marco Giunti, Hervé Paulino and António Ravara∗
+NOVA LINCS & NOVA School of Science and Technology, NOVA University of Lisbon
+Portugal
+marco.giunti@gmail.com,{herve.paulino,aravara}@fct.unl.pt
+
+ABSTRACT
+Distributed applications often deal with data with different consistency requirements: while a post in a social network only requires
+weak consistency, the user balance in turn has strong correctness
+requirements, demanding mutations to be synchronised. To deal
+efficiently with sequences of operations on different replicas of the
+distributed application, it is useful to know which operations commute with others and thus, when can an operation not requiring
+synchronisation be anticipated wrt other requiring it, thus avoiding
+unnecessary waits.
+Herein we present a language-based static analysis to extract
+at compile-time from code information on which operations can
+commute with which other operations and thus get information that
+can be used by the run-time support to decide on call anticipations
+of operations in replicas without compromising consistency. We
+illustrate the formal analysis on several paradigmatic examples and
+briefly present a proof-of-concept implementation in Java.
+INTRODUCTION
+
+Many Internet services replicate their data across multiple sites to
+improve availability, fault-tolerance and scalability. Data consistency in such systems is bound to the order on which operations
+are executed at each site, resulting in a tension between correctness and performance. Concerned about the latter, some datastores [1, 9, 14, 17, 20] avoid global synchronization by resorting
+to weaker consistency semantics, allowing replicas to temporarily
+diverge [3]. There are however some operations (such as a withdraw from a bank account) whose correctness requires consistency
+guarantees that cannot be specified in weakly consistent solutions.
+Consider the example of coordinating operations over bank accounts replicated at several sites, depicted in Fig. 1.1 From the
+perspective of each site, given a sequence of incoming operations,
+it is fundamental to know which of these require distributed coordination (in red) and which may be executed locally first and
+subsequently propagated to the remainder sites (in green). The first
+operation, acc1.deposit(100), does not require coordination and,
+hence, executes locally first. Next, acc2.transfer(acc3,100), in
+red, is placed under coordination to guarantee its execution over
+the same state at every site. It is followed by acc2.deposit(30),
+which does not require coordination but cannot execute immediately because it may interfere with the transfer under coordination,
+causing the latter to execute over different states in different sites.
+∗ Work partially supported by the Portuguese Fundacão para a Ciência e Tecnologia via
+
+project DeDuCe (PTDC/ CCI-COM/32166/2017) and NOVA LINCS (UIDB/04516/2020).
+We thank Rúben Vaz for his contribution on the Java prototype implementation (§ 5)
+used to apply Ant to common use-cases. This document is the companion technical
+report of paper [15].
+1 In the example the three account are: “acc1”, “acc2” and “acc3”.
+
+It is thus queued, waiting for the former to conclude. This restriction does not, however, apply to acc3.deposit(20), since it does
+not interfere with the execution of both acc2.deposit(30) and
+acc2.transfer(acc3,100). So, it may execute locally first, ahead
+of operations received before and concurrently with the ones in execution (regardless of the coordination involved), what we refer to
+as call anticipation. Finally, we have operation getBalance() that
+returns a weakly consistent view of an account’s balance. Although
+operating over account acc2, the operation does not conflict with
+acc2.deposit(30) nor with acc2.transfer(acc3,100) and,
+hence, may execute locally first.
+The state-of-the-art proposals on mixed consistency address
+the computation of the coordination level required by each operation executing over a distributed datastore, in order to guarantee the data’s consistency requirements. Works such as [5, 6, 18]
+provided frameworks to identify which operations may execute
+without coordination. Subsequently, others have focused on providing specifications that enable the automatic inference of the
+necessary coordination, by requiring reasoning about the side effects of each operation [13], and/or the visibility of data and how
+all these interfere with each other [18, 21].
+Regarding the analysis of which operations may run concurrently, that gives rise to call anticipation, the state-of-the-art [7, 16,
+18] is to conduct a static commutativity analysis that produces a conflict table indicating if two operations may conflict, or not, instead
+of synthesizing the conditions when they conflict (or commute),
+unlike what is currently done in other contexts [2]. Furthermore,
+the analyses work on semantic representations of the applications
+(either logical or flow-based models), not on actual code implementing the applications. They are language agnostic, but for evaluation
+purposes implement the approach in a particular setting.
+In this paper we propose a language-based call anticipation static
+analysis named Ant. Rather than providing a generic semantic
+model, agnostic to the language in which the code is written (and
+sometimes even abstract on the way the model is built), we define
+our analysis directly on the code, with a language-based algorithm
+relying instead on formal definitions of program semantics. This
+analysis is able to produce a conflict table that, for each pair of
+method calls, defines a system of inequalities that must be satisfied
+at runtime in order to anticipate a call.
+We define our analysis over a augmented version of the OOlong [4] core language, with constructs to (1) identify which fields
+are replicated, and of these, which allow for weak consistency, (2)
+the specification of invariants over the replicated fields, and (3) the
+definition of guards for method executions. The language shares
+similarities with MixT [19] or DCCT [22] but distinguishes itself by
+
+under coordination
+Site
+
+Site
+
+under coordination
+acc2.transfer(acc3, 100)
+
+Site
+
+Local
+execution
+acc1.deposit(100)
+acc2.transfer(acc3, 100)
+incoming acc2.transfer(acc3, 100) incoming acc2.deposit(30)
+acc2.deposit(30)
+acc3.deposit(20)
+acc3.deposit(20)
+acc2.getBalance()
+acc2.getBalance()
+
+under coordination
+acc2.transfer(acc3, 100)
+acc2.deposit(30)
+
+acc2.deposit(30)
+incoming acc3.deposit(20)
+acc2.getBalance()
+
+under coordination
+acc2.transfer(acc3, 100)
+
+Site
+Local
+execution
+
+Site
+
+acc2.deposit(30)
+
+under coordination
+acc2.transfer(acc3, 100)
+acc2.deposit(30)
+
+Local
+execution
+incoming
+
+incoming
+
+acc2.getBalance()
+
+acc3.deposit(20)
+acc2.getBalance()
+
+Figure 1: Bank accounts replicated among several sites. Calls that require coordination in red, the remainder are marked green.
+Table 1: Syntax of Ant-OOlong programs. Ids, Cds, Fds, Mds
+and Msigs are sequences of zero or more of their singular
+counterparts. Terms in grey background are only available
+at runtime.
+
+Table 2: Closure of preconditions closure𝐻,𝑉 ( ˜𝑐) = 𝑐˜
+𝑉 (𝑥) = 𝑣
+closure𝐻,𝑉 (𝑥) = 𝑣
+
+𝑃
+Id
+
+::=
+::=
+
+Cd
+Msig
+𝑑
+𝑐
+Md
+Fd
+𝑒
+
+::=
+::=
+::=
+::=
+::=
+::=
+::=
+
+𝑣
+𝑠𝑣
+𝑡
+Γ
+cfg
+
+::=
+::=
+::=
+::=
+::=
+
+Ids Cds 𝑒
+(Programs)
+interface 𝐼 {Msigs} |
+interface 𝐼 extends 𝐼 1, 𝐼 2
+(Interfaces)
+class 𝐶 implements 𝐼 {Fds Mds}
+(Classes)
+𝑚(𝑥 : 𝑡 1 ) : 𝑡 2 [ ˜𝑐]
+(Signatures)
+𝑥 | 𝑥 .𝑓 | 𝑣
+(Invariant values)
+𝑑 1 Rel 𝑑 2
+(Invariants)
+Msig{𝑒}
+(Methods)
+𝑓 : 𝑡 ∼weak [ ˜𝑐]
+(Fields)
+𝑠𝑣 | 𝑥 .𝑓 | 𝑥 .𝑓 = 𝑒 | 𝑥 .𝑚(𝑒) |
+let 𝑥 = 𝑒 1 in 𝑒 2 | new 𝐶 | (𝑡) 𝑒
+(Expressions)
+null | 𝑛 ∈ int | 𝜄
+(Values)
+𝑣 | 𝑥 | 𝑠𝑣 1 Op 𝑠𝑣 2
+(Symbolic Values)
+𝐼 | 𝐶 | Unit | int
+(Types)
+(Typing Environment)
+𝜖 | Γ, 𝑥 : 𝑡 | Γ, 𝜄 : 𝐶
+⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑆𝑇 ⟩
+(Configuration)
+
+𝐻
+𝑉
+sf
+
+::=
+::=
+::=
+
+𝜖 | 𝐻, 𝜄 ↦→ obj
+𝜖 | 𝑉 , 𝑥 ↦→ 𝑣
+𝜖 | sf , (𝜄, 𝑓 , r) | sf , (𝜄, 𝑓 , w)
+
+𝑆𝑇
+obj
+
+::=
+::=
+
+𝑒 | EXN
+(𝐶, 𝐹 )
+
+𝐹
+
+::=
+
+𝜖 | 𝐹, 𝑓 ↦→ 𝑣
+
+(Heap)
+(Stack)
+(Strong fields)
+(Single Threads)
+(Objects)
+(Field map)
+
+not requiring the programmer to reason about consistency levels.
+Instead they must just classify fields as weak or strong (by default).
+In short, our main contributions are the following: (1) A formal
+semantics of the state conditions under which we can anticipate
+a method call executed in a distributed runtime system featuring
+replicas (§ 3); (2) A static analysis of object-oriented methods that
+builds on side effects and on their symbolic semantics to identify a
+system of inequalities over objects’ fields and methods’ parameters
+that must be satisfied at runtime in order to anticipate a call (§ 4).
+THE LANGUAGE
+
+The object-oriented language under consideration, dubbed AntOOlong, is meant to model replicated systems where object fields
+are strongly consistent, unless explicitly marked as weakly consistent. We present in Table 1 the syntax of Ant-OOlong.
+
+𝑉 (𝑥) = 𝜄
+
+𝐻 (𝜄) = (𝐶, 𝐹 )
+
+𝐹 (𝑓 ) = 𝑣
+
+closure𝐻,𝑉 (𝑥 .𝑓 ) = 𝑣
+closure𝐻,𝑉 (𝑣) = 𝑣
+closure𝐻,𝑉 (𝑑 1 ) = 𝑣 1
+
+closure𝐻,𝑉 (𝑑 2 ) = 𝑣 2
+
+closure𝐻,𝑉 (𝑑 1 Rel 𝑑 2 ) = 𝑣 1 Rel 𝑣 2
+closure𝐻,𝑉 (𝑐 1 ) = 𝑐 1′ · · · closure𝐻,𝑉 (𝑐𝑛 ) = 𝑐𝑛′
+closure𝐻,𝑉 (𝑐 1, . . . , 𝑐𝑛 ) = 𝑐 1′ , . . . , 𝑐𝑛′
+
+Syntax. So, a field declaration, by default strongly consistent,
+can be optionally flagged with the weak keyword to indicate that
+the field has weak consistency. Field and method declarations are
+decorated with a (possibly empty) set of invariants 𝑐, where in the
+latter case 𝑐 is often referred to as a precondition; an invariant is
+an application of a binary predicate Rel over integers. Invariants
+are used solely for program analysis purposes (the call anticipation analysis of § 3 and § 4), and have no impact on the dynamic
+semantics.
+A value 𝑣 can be a null reference, an integer 𝑛 or a location 𝜄. A
+novelty is the presence of symbolic values 𝑠𝑣 that include values,
+variables 𝑥 and applications of integers operators Op to symbolic
+values. As usual, occurrences of a variable 𝑥 are bound in an expression 𝑒 2 in the context of a let-expression let 𝑥 = 𝑒 1 in 𝑒 2 . Occurrences
+of other variables in 𝑒 2 , or in general in an expression not inside a
+let are free.
+Semantics. The evaluation relation, noted cfg ↩→ cfg ′ , recast the
+single-thread semantics of OOlong, modulo the presence of integer
+operations. The rules are in defined in Table ??. We omit the rules
+for exceptions, which are those defined in [4]. A configuration cfg
+is pair ⟨Σ, 𝑒⟩ where Σ is the state and 𝑒 is an expression. A state
+contains a heap 𝐻 mapping locations to objects, a stack 𝑉 mapping
+variables to values, and two extra-fields to monitor the method calls’
+preconditions and the access to strong fields, respectively.
+The first extra-field monitors if an execution respected the method’s
+preconditions: e.g. if a method 𝑚 of class 𝐶 has the pre-condition
+this.𝑓 ≥ 1, where 𝑓 is an integer field of 𝐶, and 𝑚 is executed, then
+
+Figure 2: Semantics of Ant-OOlong programs cfg ↩→ cfg ′
+𝐸 [•]
+
+::=
+
+𝑥 .𝑓 = • | 𝑥 .𝑚(•) | • Op 𝑠𝑣 | 𝑠𝑣 Op • | let 𝑥 = • in 𝑒 | (𝑡) •
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑒⟩ ↩→ ⟨𝐻 ′, 𝑉 ′, sf ′, 𝑐˜ ′, 𝑒 ′ ⟩
+dynEvalCxt
+
+dynEvalOp
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, 𝐸 [𝑒]⟩ ↩→ ⟨𝐻 ′, 𝑉 ′, sf ′, 𝑐˜ ′, 𝐸 [𝑒 ′ ]
+
+𝑛 = 𝑛 1 Op 𝑛 2
+⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑛 1 Op 𝑛 2 ⟩ ↩→ ⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑛⟩
+𝑉 (𝑥) = 𝜄
+𝐹 (𝑓 ) = 𝑣
+
+𝑉 (𝑥) = 𝑣
+dynEvalVar
+
+dynEvalSelect
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑥⟩ ↩→ ⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑣⟩
+
+𝐻 (𝜄) = (𝐶, 𝐹 )
+sf ′ = sf , (𝜄, 𝑓 , r)
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑥 .𝑓 ⟩ ↩→ ⟨𝐻 ′, 𝑉 , sf ′, ˜𝑐, 𝑣⟩
+
+𝑉 (𝑥) = 𝜄
+𝐻 (𝜄) = (𝐶, 𝐹 )
+𝐻 ′ = 𝐻 [𝜄 ↦→ (𝐶, 𝐹 [𝑓 ↦→ 𝑣])]
+sf ′ = sf , (𝜄, 𝑓 , w)
+dynEvalUpdate
+
+dynEvalNew
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑥 .𝑓 = 𝑣⟩ ↩→ ⟨𝐻 ′, 𝑉 , sf ′, ˜𝑐, null⟩
+
+fields(𝐶) = 𝑓1 : 𝑡 1 ∼weak [𝑐˜1 ], . . . , 𝑓𝑛 : 𝑡𝑛 ∼weak [𝑐˜𝑛 ]
+𝐹 = 𝑓1 ↦→ init(𝑡 1 ), . . . , 𝑓𝑛 ↦→ init(𝑡𝑛 )
+𝜄 fresh
+
+dynEvalLet
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, new 𝐶⟩ ↩→ ⟨𝐻 [𝜄 ↦→ (𝐶, 𝐹 )], 𝑉 , sf , ˜𝑐, 𝜄⟩
+
+𝑥 ′ fresh
+
+𝑉 ′ = 𝑉 [𝑥 ′ ↦→ 𝑣]
+
+𝑒 ′ = 𝑒 [𝑥 ↦→ 𝑥 ′ ]
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, let 𝑥 = 𝑣 in e⟩ ↩→ ⟨𝐻, 𝑉 ′, sf , ˜𝑐, 𝑒 ′ ⟩
+
+𝐻 (𝜄) = (𝐶, 𝐹 )
+𝑚(𝑦 : 𝑠) : 𝑡 ′ [𝑐˜ ′ ]{𝑒} ∈ methods(𝐶)
+𝑥 ∉ 𝑏𝑣 (𝑒)
+𝑦 ′ fresh
+′
+′
+′
+𝑉 = 𝑉 [𝑦 ↦→ 𝑣]
+𝑒 = 𝑒 [this ↦→ 𝑥] [𝑦 ↦→ 𝑦 ′ ]
+
+𝑉 (𝑥) = 𝜄
+dynEvalCast
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, (𝑡)𝑣⟩ ↩→ ⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑣⟩
+
+dynEvalCall
+
+the first extra-field contains the entry 𝑛 ≥ 1, where 𝑛 is the value of
+this.𝑓 at execution time; by evaluating 𝑛 ≥ 1 after the call’s execution, we are able to infer if the call was legit. The second extra-field
+contains entries of the form (𝜄, 𝑓 , r) and (𝜄, 𝑓 , w) indicating that the
+strong field 𝑓 of the object in location 𝜄 has been accessed during
+the execution in read and write mode, respectively.
+An object is a pair (𝐶, 𝐹 ), where 𝐶 is a class identifier and 𝐹 is a
+map from fields to values.
+Type System. The typing rules for expressions are those of [4]
+extended with the rules for integers. The rules inductively define
+the typing relation Γ ⊢ 𝑒 : 𝑡. The typing rules for fields and methods
+enforce that an invariant 𝑐 of a field 𝑓 cannot refer to fields different
+from 𝑓 , and a precondition 𝑐 of a method cannot refer to weak fields,
+respectively. The typing rules for configurations, noted as Γ ⊢ cfg : 𝑡,
+extend straightforwardly [4] by adding the rules for the monitoring
+fields.
+All typing rules are available in § A.
+Programming Example. Listing 1 shows how to program in AntOOlong an account whose balance is replicated but does not require
+strong consistency. Importantly, as intended, the code is identical to
+a non-replicated implementation. The weak field balance cannot
+be mentioned in the methods’ preconditions; on contrast, the strong
+field min_cash can be accessed in method init to verify that the
+initial amount is greater or equal to the minimum allowed. The state
+invariant is the invariant of fields balance and min_cash. Methods that do not change the state invariant are locally permissible
+(cf. getBalance), while a method 𝑚 that may change the state invariant is locally permissible in a pre-state satisfying its invariants
+if and only if all calls of 𝑚 satisfying the preconditions spawned
+from the call lead to post-states that satisfy their invariants; for
+
+⟨𝐻, 𝑉 , sf , ˜𝑐, 𝑥 .𝑚(𝑣)⟩ ↩→ ⟨𝐻, 𝑉 ′, sf , ( ˜𝑐, closure𝐻, [𝑦↦→𝑣 ] (𝑐˜ ′ )), 𝑒 ′ ⟩
+
+Listing 1: Bank account
+class Account implements Object {
+balance : int weak [ this . balance ≥ 0]
+min_cash : int [ this . min_cash ≥ 50]
+def init ( amount : int ) : Unit [ amount ≥ this . min_cash ]{
+this . balance = amount
+
+}
+
+def withdraw ( amount : int ) : Unit [ amount > 0] {
+this . balance -= amount
+
+}
+
+def transfer ( recv : Transfer ) : Unit {
+let a = recv . amount in let w = recv . account in
+this . withdraw (a ); w. deposit (a)
+}
+def deposit ( amount : int ) : Unit [ amount > 0] {
+this . balance += amount
+
+}
+
+def accrueInterest ( interest : int ) : Unit {
+let x = this . balance * interest / 100 in
+this . balance += x
+}
+def getBalance () : int
+
+{ this . balance }
+
+}
+
+instance, a call transfer(𝑛) spawns the precondition 𝑛 > 0. Therefore, methods init and deposit are locally permissible, since the
+amount to be initialized or deposited, respectively, must be positive,
+while withdraw, transfer and accrueInterest are not locally
+permissible.
+Method Call Execution. Ant method calls execute as indivisible
+units over the target data. § 7 will elaborate on the consistency level
+assigned to the execution of each method call.int For now, to make
+the presentation of the following sections clearer, we simply state
+that method calls that either access strong fields or are not locally
+
+permissible require strong consistency semantics. The remainder
+may execute under causal or even eventual consistency, depend- 1
+ing on whether causality relations have been identified between 23
+methods or not.
+3
+
+METHOD CALL ANTICIPATION
+
+This section introduces the runtime notion of method call anticipation, which defines, given a sequence of method calls executed
+in a distributed runtime system featuring replicas, the state conditions under which one of the calls can be safely anticipated in the
+sequence, without leading to possible inconsistent state in different
+replicas executing that same sequence. To this aim, taking inspiration from Hamsaz [16], we recast the notion of local permissible
+methods and of commutative method calls in Ant, and we equip
+them with a formal semantics with respect to our language.
+7
+9
+11
+13
+15
+
+Key notions. Before defining call anticipation, we present the
+main concepts we build on. In the remainder, we use mc to range
+over expressions 𝑥 .𝑚(𝑠𝑣), and consider configurations ⟨Σ, mc⟩, where
+we assume that there exists Γ and 𝑡 s.t. Γ ⊢ ⟨Σ, mc⟩ : 𝑡. Whenever
+there are a state Σ ′ and a value 𝑣 s.t. ⟨Σ, mc⟩ ↩→∗ ⟨Σ ′, 𝑣⟩, we let
+update(mc, Σ) = Σ ′ . We denote single substitutions with ↦→, and,
+given an invariant value 𝑑 and a state Σ, let the substitution 𝑑Σ be
+equal to 𝑣 when 𝑑 = 𝑥 and 𝑉 (𝑥) = 𝑣, or 𝑑 = 𝑥 .𝑓 and 𝑉 (𝑥) = 𝜄 and
+𝐻 (𝜄) = (𝐶, 𝐹 ) and 𝐹 (𝑓 ) = 𝑣, and be equal to 𝑑 otherwise, where 𝐻
+and 𝑉 are the heap and the stack of Σ, respectively.
+Satisfied Invariant An invariant 𝑑 1 Rel 𝑑 2 is satisfied by a state Σ,
+noted Σ ⊪ 𝑑 1 Rel 𝑑 2 , whenever 𝑑 1 Σ Rel 𝑑 2 Σ = true.
+State Invariant Let 𝐻 and 𝑉 be the heap and the stack of a state
+Σ, respectively. The invariant predicate I(Σ) holds whenever
+𝑉 (𝑥) = 𝜄 and 𝐻 (𝜄) = (𝐶, 𝐹 ) and 𝑓 : 𝑡 ∼ weak [ ˜𝑐] is a field
+declaration of class 𝐶 and 𝑐 ∈ 𝑐˜ imply Σ ⊪ 𝑐 [this ↦→ 𝑥].
+Call Guard Let Σ be a state with empty monitored preconditions,
+and assume update(mc, Σ) = Σ ′ . A call mc is Σ-guarded
+when 𝑐 is a monitored precondition of Σ ′ implies Σ ′ ⊪ 𝑐.
+We are interested in analyzing the permissibility of a guarded
+call in a given pre-state, that is when the post-state spawned by the
+call preserves the invariant of the pre-state. Local permissibility of
+a method requires that all its guarded calls are permissible.
+Permissible and Not-Permissible Calls Let mc be a Σ-guarded
+method call. We say that mc is permissible in Σ, written as
+P(Σ, mc), if I(Σ) implies I(update(mc, Σ)); and we say that
+mc is not permissible in Σ, written as NP(Σ, mc), if I(Σ) implies ¬I(update(mc, Σ));
+Locally Permissible A method 𝑚 is locally permissible in a state
+Σ, written as LP(Σ, 𝑚), if and only if,
+all Σ-guarded calls of 𝑚 are permissible in Σ.
+State-commutativity and State-conflict are symmetric binary
+relations over method calls indexed by states. Rather than requiring,
+as in [16], that commuting method calls enforce this behaviour in
+all possible states, we tailor our analysis and definition to the state
+under consideration.
+State-Commutativity and State-Conflict Let Σ be a state. Two
+method calls mc and mc ′ Σ-commute if and only if
+update(𝑚𝑐 ′, update(𝑚𝑐, Σ)) = update(𝑚𝑐, update(𝑚𝑐 ′, Σ))
+Otherwise, they Σ-conflict.
+
+Table 3: Call Anticipation Algorithm
+let anticipation ( Sigma : state ) ( mc1 mc2 : call ) : bool =
+if commute Sigma mc1 mc2 then
+let m1 = methodOf mc1 in let m2 = methodOf mc2 in
+match LP Sigma m2 || forall n1 ,... , nm . P ( WIFG Sigma ( n1 ,... , nm )) mc2 with
+| true ->
+forall n1 ,... , nm .
+let pre = wifg Sigma ( n1 ,... , nm ) in
+let post = update mc2 pre in
+( match LP post m1 with
+| true -> LP post m1
+| false -> ( if P pre mc1 then P post mc1 ) &&
+if NP pre mc1 then NP post mc1 ) &&
+strong_fields_non_interference Sigma mc1 mc2
+| false -> false
+else false
+
+We are now ready to introduce the (as far as we know, original)
+notion of call anticipation, stating:
+when can a sequence of two method calls mc; mc ′ be reordered into
+mc ′ ; mc, thus anticipating the call mc ′ .
+To this aim, we rely on (1) quantification over integers instantiating the weak consistency fields, and (2) the fields that must
+preserve strong consistency within a method call mc. Quantification is needed since, in our analysis, we cannot trust the actual
+value of fields with weak consistency, because they could be outdated. The weak integer fields’ generalization of a state Σ w.r.t. a
+tuple of integers 𝑁 = 𝑛 1, . . . , 𝑛𝑚 , noted wifg(Σ, 𝑁 ), is obtained by
+substituting the values in the field map of the objects in the heap,
+such that the field is an integer tagged with weak with the integers
+in 𝑁 , where we assume that the are 𝑚 such values.
+The anticipation algorithm. is presented in Listing 3: given a
+state Σ and a sequence mc 1 ; mc 2 , it says when we are allowed to
+anticipate the call mc 2 w.r.t. mc 1 .
+The algorithm requires that the two calls are commutative (l2);
+subsequently, we have the following steps:
+(1) check whether the call mc 2 is locally permissible in the prestate Σ or if the call is permissible for all possible values of
+the weak integer fields of Σ (l4);
+(2) check whether for all possible values 𝑛 1, ..., 𝑛𝑚 of the weak
+integer fields of Σ, the call mc 1 is locally permissible in the
+post-state, that is the update of wifg(Σ, (𝑛 1, ..., 𝑛𝑚 )) with
+mc 2 (l6–9);
+(a) if not, check whether the permissibility of mc 1 has not
+changed in the pre and in the post states:
+• if mc 1 was permissible in the pre-state, it must be permissible in the post-state (l11)
+• if mc 1 was not permissible in the pre-state, it must be
+non-permissible in the post-state (l12);
+(3) check whether the value of strong fields accessed in read
+mode in the execution of ⟨update(mc 1, Σ), mc 2 ⟩ are not accessed in write mode during the execution of ⟨Σ, mc 1 ⟩ (l13).
+To see why the double implication is necessary in 2(a), consider the case where there are two replicas and a sequence of calls
+mc 1 ; mc 2 , and where 𝑚𝑐 1 is both non-permissibile in the first replica
+and permissible in the second replica, because the two replicas are
+accessing weak fields with different values. The anticipation of mc 2
+should preserve this invariant: that is, after the anticipation of mc 2 ,
+the call mc 1 should still be non-permissibile in the first replica and
+non-permissible in the second replica, otherwise the two replicas
+would diverge after performing the call anticipation.
+
+We stress that both checks 1) and 2) must be effectuated irrespectively of the actual values of the weak (integer) fields in the
+heap, hence the usage of universal quantification.
+Limitations. The main obstacle to use the algorithm at runtime
+is the overhead: the use of quantification would require the help
+of a constraint solver, which in most cases would make unfeasible
+to obtain an answer in a reasonable time. This motivates the need
+of the static analysis introduced in § 4: it returns a system of inequalities over integer fields and method’s parameters that can be
+efficiently checked at runtime in order to decide anticipation.
+Example 3.1. Consider the methods defined in Listing 1, the
+sequence 𝑥 .withdraw(5); 𝑥 .deposit(10), and a state Σ where the
+heap contains, for some integer 𝑛 ′ ≥ 0, the entry
+𝑥 ↦→ (𝐴, 𝐹 [balance ↦→ 𝑛 ′ ] [min_cash ↦→ 50])
+We apply the algorithm steps to decide if we can obtain the sequence 𝑥 .deposit(10); 𝑥 .withdraw(5). The methods commute, as
+the operations + and − do. Deposit is LP, therefore step (1) is
+fulfilled. In step (2), wifg(Σ, 𝑛) contains a heap with an entry
+𝑥 ↦→ (𝐴, 𝐹 [balance ↦→ 𝑛] [min_cash ↦→ 50]) (the weak value
+𝑛 ′ has been substituted with an arbitrary 𝑛). Thus, withdraw is not
+LP in this state, since a call 𝑥 .withdraw(𝑎) with 𝑛 < 𝑎 would not
+be permissible, as it would break the post-state invariant.
+The next step is the analysis of sub-case (2.a): we need to establish
+that if the call 𝑥 .withdraw(5) is (not-)permissibile in the pre-state,
+then it is (not-)permissible in the post-state, respectively. This does
+not hold: e.g. when 𝑛 < 5, we have that 𝑥 .withdraw(5) is not
+permissible, while it is permissible in the post-state, since 𝑛 ≥ 0
+implies 5 < 𝑛 + 10, and in turn the post-state satisfies its invariant.
+The algorithm therefore returns false.
+STATIC SEMANTICS OF ANTICIPATION
+
+In this section, we present a source-level analysis of Ant programs.
+The aim is the automatic generation of the conditions under which,
+given a sequence of method calls mc 1 ; mc 2 executed in a distributed
+runtime system featuring replicas, we can anticipate the call mc 2
+w.r.t. mc 1 , leading to the sequence mc 2 ; mc 1 . The conditions are
+expressed in terms of a system of inequalities populated by aliases
+of the integer fields, and of the actual (integer) parameters.
+The analysis has three levels – we identify:
+(1) the conditions under which pairs of methods can give rise
+to commutative calls;
+(2) locally permissible methods that do not need any coordination at runtime;
+(3) and, when a method is not LP, the conditions under which
+its call can be anticipated.
+
+Effect Inference
+The core of the source-level analysis of Ant programs is the effects
+of methods. An effect list provides a representation of a program
+that is executed in a memory-based model. We refer to it as symbolic to distinguish from the actual semantics of OOlong. As in the
+standard semantics, there is an operation to change the fields of
+objects, operations to introduce bindings, etc. The aim is to track
+the side effects of a method executed abstractly in a state where
+
+Table 4: Effects of typed methods
+
+𝑥𝑏
+𝑏
+
+::=
+::=
+
+Syntax of effects
+VbindL (𝑥) | VbindC (𝑥, ˜
+𝑐) | Vfield (𝑥, 𝑓 )
+Evar (𝑥𝑏 ) | Eop (𝑂𝑝, 𝑒) | Eret (𝑒) | Enew (𝐶, Fds)
+
+E
+
+::=
+::=
+
+[] | 𝑏 :: 𝐸
+( ˜𝑐, 𝐸)
+
+eff
+
+Static inference rules for expressions and methods.
+
+eOp
+eNew
+
+eCall
+eUpdate
+eLet
+
+(Effect Variables)
+(Effect Expressions)
+(Effect Expression Lists)
+(Effect)
+
+Γ ⊢𝑒 ⊲𝐸
+
+Γ ⊢𝑥 Md ⊲ eff
+
+Γ ⊢ 𝑠𝑣1 ⊲ 𝐸 1
+Γ ⊢ 𝑠𝑣1 Op 𝑠𝑣2 ⊲ 𝐸 1 ◦ [ Eop (𝑂𝑝, 𝑠𝑣2 ) ]
+
+Γ ⊢ new 𝐶 ⊲ [Enew (𝐶, fields (𝐶 ) ) ]
+
+Γ ⊢ 𝑠𝑣 ⊲ 𝐸 1 Γ (𝑥 ) = 𝐶 𝑚 (𝑦 : 𝑠 ) : 𝑡 ′ [𝑐˜ ]{𝑒 } ∈ methods (𝐶 )
+𝑥 ∉ bv(𝑒 ) Γ, 𝑦′ : 𝑠 ⊢ 𝑒 [this ↦→ 𝑥 ] [𝑦 ↦→ 𝑦′ ] ⊲ 𝐸 2 𝑦′ fresh
+Γ ⊢ 𝑥 .𝑚 (𝑠𝑣) ⊲ 𝐸 1 ◦ Evar ( VbindC (𝑦′ , 𝑐 [this ↦→ 𝑥 ] [𝑦 ↦→ 𝑦′ ]) ) :: 𝐸 2
+
+Γ ⊢ 𝑠𝑣 ⊲ 𝐸 1
+Γ ⊢ 𝑥 .𝑓 = 𝑠𝑣 ⊲ 𝐸 1 ◦ [ Evar ( Vfield (𝑥, 𝑓 ) ) ]
+
+eCast
+
+Γ ⊢ 𝑒1 : 𝑡
+Γ, 𝑥 ′ : 𝑡 ⊢ 𝑒 2 [𝑥 ↦→ 𝑥 ′ ] ⊲ 𝐸 2
+Γ ⊢ let 𝑥 = 𝑒 1 in 𝑒 2 ⊲ 𝐸 1 ◦ Evar ( VbindL (𝑥 ′ ) :: 𝐸 2
+
+Γ ⊢ 𝑒1 ⊲ 𝐸1
+
+eExpr
+eMethod
+
+Γ ⊢𝑒: ⊲𝐸
+Γ ⊢ (𝑡 )𝑒 ⊲ 𝐸
+𝑥 ′ fresh
+
+𝑒 = 𝑥 or 𝑒 = 𝑣 or 𝑒 = 𝑥 .𝑓
+Γ ⊢ 𝑒 ⊲ [Eret (𝑒 ) ]
+
+Md = 𝑚 (𝑥 : 𝑡 1 ) : 𝑡 2 [𝑐˜ ]{𝑒 }
+
+Γ, 𝑥 : 𝑡 1 ⊢ 𝑒 ⊲ 𝐸
+
+Γ ⊢ Md ⊲ ( ˜
+𝑐, 𝐸)
+
+the heap contains symbolic instances of this and of the formal parameter, dubbed other, such that their integer fields are aliased by
+uninstantiated variables. Interestingly, effects have a flat structure,
+that is, lists of effects are symbolically executed in a non-inductive
+deterministic framework that relies on a single memory cell for the
+return value, thus providing the ground for efficient implementations.
+The syntax of effects and their inference rules are in Table 4; the
+top-level rule for methods, noted Γ ⊢ Md ⊲ eff , assumes that Md
+belongs to a type-checked program 𝑃 [4]: in such case, we say that
+the method Md has effect eff . In the rules for expressions, where
+we use ◦ for list concatenation, we consider four side effects, or
+effect expressions:
+• Evar, the effect of a let-expression, of a method call, or of
+an update;
+• Eop, the effect of an integer operation;
+• Enew, the effect of a new;
+• Eret, the return-only effect of the remaining expressions.
+The parameter of Evar is an effect variable: the effect variables
+for let-expressions and calls receive as parameter a variable 𝑥 that is
+freshly added by the inference system in order to substitute the occurrences of the let-variable and of the method’s formal parameter,
+respectively (cf. eLet and eCall). Given the class of the instance,
+in eCall the effect of the call is calculated by substituting both the
+occurrence of this in the body with the caller 𝑥, where we assume
+that 𝑥 is not bound in the body (eventually by alpha-renaming), and
+the occurrence of the formal parameter with the fresh variable 𝑦.
+Notably, the effect variable VbindC(𝑦, ˜𝑐) of a method call also carries the method’s preconditions 𝑐˜ opportunely instantiated with the
+actual caller and the fresh variable instantiating the formal parameter: this allows to track the chain of preconditions originating from
+nested method calls, and the actual parameters of the preconditions.
+The effect variable for an update provides the variable and the field
+(cf. eUpdate); the symbolic value 𝑠𝑣 to be assigned to the field is
+
+the result of the symbolic evaluation of the last entry on the left
+in the returned effect list, that is the tail of 𝐸 1 . For instance, when
+𝑠𝑣 = 𝑠𝑣 1 Op 𝑠𝑣 2 , this would be the tail [Eop(𝑂𝑝, 𝑠𝑣 2 )], symbolically
+evaluated after the evaluation of the effect of 𝑠𝑣 1 (cf. eOp). This is
+the general mechanism to pass values among effects: each effect 𝑏
+in 𝐸 ◦ 𝑏 :: 𝐸 ′ “receives” the result of the evaluation of the tail of 𝐸.
+Symbolic Semantics. Recall2 that a configuration is a pair with a
+state and an expression, being the state a fourtuple (heap, stack, a
+field to monitor method calls’ pre-conditions and another to record
+access to strong fields). Symbolic configurations 𝑒cfg are composed
+by: a symbolic heap, containing objects that have symbolic values
+in their field map; a symbolic stack, mapping variables to symbolic
+values; a field to monitor the access to strong fields (as in standard
+configurations); an effect; and a symbolic value, also called buffer,
+returned by the last effect expression evaluated in the effect list.
+Intuitively, the semantics of an effect eff is based on evaluating
+it in a symbolic configuration, a relation noted 𝑒cfg → 𝑒cfg ′ . The
+interested reader will find the evaluation rules in § B. By executing
+the effect of a method definition in a symbolic state and consuming
+all entries of the effect list, we obtain a state’s heap containing the
+manipulations done by the method’s body to the objects in the heap
+(which may grow due to new expressions, cf. eNew). Moreover, in
+order to describe the behaviour of all guarded calls of the method,
+we require that the final preconditions are SAT.
+For a symbolic configuration 𝑒cfg, let updates (𝑒cfg) = 𝑒cfg ′
+whenever 𝑒cfg →∗ 𝑒cfg ′ , and 𝑒cfg ′ contains the effect (𝑐˜ ′, []),
+and 𝑐˜ ′ is SAT. Given the invariants 𝑐˜ and a symbolic state 𝑒Σ,
+let the (𝑒Σ-)closure of 𝑐˜ = 𝑐 1, . . . , 𝑐𝑛 , noted ˜𝑐𝑒Σ, be the invariants
+𝑐 1𝑒Σ, · · · , 𝑐𝑛 𝑒Σ, where each 𝑐𝑖 𝑒Σ is obtained by substituting the
+fields in 𝑐𝑖 with the values in 𝑒Σ (cf. § 3), 1 ≤ 𝑖 ≤ 𝑛.
+Example 4.1. To illustrate the symbolic evaluation of effects, we
+symbolically execute method init in Figure 1.
+Let 𝑎, 𝑏 and 𝑚 abbreviate amount, balance and min_cash, respectively. The effect of the body is eff = ((𝑎 ≥ 0, 𝑎 ≤ this.𝑚), 𝐸),
+where 𝐸 = Eret(𝑎) :: Evar(Vfield(this, 𝑏)].
+Consider the heap [this ↦→ (𝐴, [𝑏 ↦→ 𝑧] [𝑚 ↦→ 𝑦])]. To complete
+the configuration, noted 𝑒cfg, we add an empty stack, empty monitored strong fields, the effect obtained by closing the precondition,
+and the buffer null; the closure is (𝑎 ≥ 0, 𝑎 ≤ 𝑦).
+Given a variable 𝑥, we say that the reduction system locates 𝑥
+whenever it finds 𝑥 in the domain of the stack, or in the domain of
+the heap.
+The first reduction step takes the head of the effect list, produces
+a configuration containing the precondition and the effect’s tail,
+fails to locate 𝑎, and in turn sets the buffer to 𝑎 (where if e.g. we
+had 𝑒𝑉 (𝑎) = 𝑠𝑣, the buffer would have been set to 𝑠𝑣).
+The second step produces the precondition and an empty effect
+list, locate this, produces the heap [this ↦→ (𝐴, [𝑏 ↦→ 𝑎] [𝑚 ↦→ 𝑦])],
+and sets the buffer to null, thus producing a configuration 𝑒cfg ′ .
+Now the computation ends, as the effect list is empty. Note that
+since the reached precondition (𝑎 ≥ 0, 𝑎 ≤ 𝑦) is SAT, the heap of
+the redex contains the legit modifications done by all guarded calls
+of init: updates (𝑒cfg) = 𝑒cfg ′ . This would not have been the case
+2 Definition in the paragraph on the Dynamic Semantics in § 2.
+
+if, for instance, the body of init was this.deposit(−10), which
+would have spawn (𝑎 ≥ 0, 𝑎 ≤ 𝑦, −10 ≥ 0) as final precondition.
+
+Effect-based anticipation analysis
+The static analysis presented in this section relies on the symbolic
+representation of objects: given a class, we generate an instance
+by generalizing all integer fields with symbolic variables, and by
+instantiating all object fields with generated instances of their class.
+Given a set of classes, we generate a symbolic state, noted 𝑒Σ,
+by generating a symbolic heap containing symbolic objects, by
+adding an empty stack, and by adding empty monitored strong
+fields. In order to generate the heap for the analysis, we thus need
+to determine the set of classes under consideration, and the aliases
+to objects. Given two methods definitions Md 1, Md 2 whose method
+calls are executed in sequence, the classes involved are those of
+this1 and this2 , and those of other1 and other2 iff each other𝑖
+is an object, 𝑖 = 1, 2; each class could recursively spawn further
+instances by having object fields. In order to generate the aliases,
+we need to control interference among the two calls of the methods.
+To this aim, we analyze all possible equalities among the locations
+of the objects instantiating this1 , this2 , other1 , and other2 , noted
+𝑥 1  𝑥 2 . In general, there are fifteen possible equalities cases, e.g.
+1) this1  this2 and this2  other1 and other1  other2 , or
+6) this1  this2 and other1  other2 , or 12) this1  other2 ,
+and so on. In particular, e.g. when the type of both the first and
+the second method’s parameter is not a class, we have at least two
+cases: this1  this2 or this1 ̸  this2 . We indicate the equality case
+under analysis with h, and write gen(h, Md 1, Md 2 ) to indicate the
+symbolic state induced by the generated symbolic heap containing
+the entries projected by h: e.g., in case 1) above the heap must
+contain an object entry aliased by this𝑖 , other𝑖 , 𝑖 = 1, 2; in case
+6) it must contain an entry aliased by this𝑖 , 𝑖 = 1, 2 and another
+different entry aliased by other𝑖 , 𝑖 = 1, 2; in case 12) it must contain
+an entry aliased by this1, other2 , a different entry for this2 , and,
+if other1 is an object, a different entry for other1 .
+Symbolic Method Sequence. Consider: (i) an equality case h; (ii)
+method definitions Md 1 and Md 2 such that, for each 𝑖 ∈ {1, 2},
+this𝑖 : 𝐶𝑖 ⊢ Md𝑖 ⊲ (𝑐˜𝑖 , 𝐸𝑖 ); (iii) 𝑒Σ = gen(h, Md 1, Md 2 ); (iv)) 𝑒cfg =
+⟨𝑒Σ, (𝑐˜1𝑒Σ, 𝐸 1 ), null⟩.
+Assume updates (𝑒cfg) = 𝑒cfg ′ , where 𝑒cfg ′ contains state 𝑒Σ ′
+and effect (𝑐˜ ′, []).
+Furthermore, consider the configuration 𝑒cfg 2 obtained from
+𝑒cfg ′ by: (i) substituting the stack with an empty stack, the effect
+with (𝑐˜2𝑒Σ ′, 𝐸 2 ), and the buffer with null; and (ii) by adding a
+separator to the monitored strong fields.
+Finally, assume that updates (𝑒cfg 2 ) = 𝑒cfg ′′ and that 𝑒cfg ′′
+contains heap 𝑒𝐻 , monitored strong fields sf , and effect (𝑐˜ ′′, []).
+We can now define the notion symbolic method sequence:
+h
+
+Md 1 ; Md 2 −→ 𝑒𝐻, sf , (𝑐˜ ′, 𝑐˜ ′′ )
+Symbolic commutativity and local permissibility. The static notion of commutative method sequence is parametrized by a set
+of equations over symbolic values: the equations are the result of
+comparing the symbolic heaps obtained by symbolically executing
+a sequence of two methods, and its inverse. Commutativity says
+under which conditions the two methods commute, that is it holds
+
+Table 5: Method Anticipation Algorithm
+2
+4
+6
+8
+10
+
+let ant ( h : eqCase ) ( c1 c2 : classDef ) ( md1 md2 : methodDef ) : prop list =
+let eSigma = gen h md1 md2 in
+let eqs , cc = scommute h md1 md2 in
+let eff2 = hasEffect c2 md2 in
+let < eSigma ' ' ,_ ,_ > = update_s eSigma eff2 null in
+eqs :: cc :: sLP eSigma md2 ::
+sLP eSigma ' ' md1 \/
+forall x in ( weak_inv eSigma ) .
+(( sP eSigma md1 = > sP eSigma ' ' md1 ) /\
+( sNP eSigma md1 = > sNP eSigma ' ' md1 ) ) :: [ SFNI h md1 md2 ]
+
+when there exists a set of equations 𝑒𝑞𝑠 that equate the symbolic
+heaps 𝑒𝐻 ′ and 𝑒𝐻 ′′ of the two method sequences, respectively,
+noted 𝑒𝑞𝑠 ⊪ 𝑒𝐻 1 ∼ 𝑒𝐻 2 , and when the state invariant and the
+invariants of the two sequences are satisfied.
+The state invariant inv(𝑒Σ) = ˜𝑐𝑒Σ, is the set of invariants 𝑐˜ built
+upon the fields’ invariants of the objects’ classes contained in the
+heap 𝑒𝐻 of 𝑒Σ, and closed by the actual values of the fields in 𝑒𝐻 .
+The weak state invariant, noted weak_inv(𝑒Σ), is the subset of
+the invariants of inv(𝑒Σ) s.t. their fields are marked as weak in
+their classes.
+Let fv( ˜𝑐) denote the free variables of a set of invariants ˜𝑐.
+Two method definitions Md 1 and Md 2 commute. w.r.t. equality
+case h, equations 𝑒𝑞𝑠, and invariants ˜𝑐, noted
+𝑒𝑞𝑠; 𝑐˜ |=h Md 1 ⇄ Md 2
+whenever
+h
+• Md 1 ; Md 2 −→ 𝑒𝐻 ′, sf ′, 𝑐˜′ ;
+h
+• Md 2 ; Md 1 −→ 𝑒𝐻 ′′, sf ′′, 𝑐 ˜′′ ;
+′
+• 𝑒𝑞𝑠 ⊪ 𝑒𝐻 ∼ 𝑒𝐻 ′′ ; and
+• 𝑐˜ = inv(gen(h, Md 1, Md 2 )), 𝑐˜′, 𝑐 ˜′′ .
+
+The static analysis of local permissibility provides the poststate invariant3 that must hold after the symbolic execution of
+the method when the pre-state invariant and the method’s preconditions hold: that is, the analysis returns a proposition (e.g. a term
+of type Prop in Coq) that must be SAT in order to establish local
+permissibility.
+Static Analysis of Locally Permissible Methods. Let Md be a method
+s.t. this : 𝐶 ⊢ Md ⊲ ( ˜𝑐, 𝐸), and let 𝑒cfg = ⟨𝑒Σ, ( ˜𝑐, 𝐸), null⟩, where
+𝑒Σ contains a symbolic heap with an entry [this ↦→ (𝐶, 𝑒𝐹 )], for
+some symbolic field map 𝑒𝐹 . Let updates (𝑒cfg) = 𝑒cfg ′ with 𝑒cfg ′
+containing the state 𝑒Σ ′ and the effect (𝑐˜ ′, []).
+We say that:
+• Md is permissible in 𝑒Σ up-to 𝜙, noted sP(𝑒Σ, Md) = 𝜙,
+whenever 𝜙 = inv(𝑒Σ) ∧ 𝑐˜ ′ ⇒ inv(𝑒Σ ′ );
+• Md is not-permissible in 𝑒Σ up-to 𝜙, noted sNP(𝑒Σ, Md) = 𝜙,
+whenever 𝜙 = inv(𝑒Σ) ∧ 𝑐˜ ′ ⇒ not(inv(𝑒Σ ′ )).
+• Md is locally permissible in 𝑒Σ up-to 𝜙, noted
+sLP(𝑒Σ, Md) = 𝜙,
+whenever 𝜙 = ∀𝑥 ∈ fv(inv(𝑒Σ), 𝑐˜ ′ ) . sP(𝑒Σ, Md).
+The Method Anticipation algorithm. (in Table 5), to decide when
+two method calls can be swapped, resembles that in Table 3 but: (i) is
+3 State-invariant is a notion presented in the beginning of § 3
+
+source-level, that is, it analyzes two method definitions without relying on a state; (ii) returns a list of propositions whose conjunction
+must be satisfied at runtime.
+The algorithm works like this:
+(1) after building the initial symbolic state (l2), generates the
+conditions for commutativity (l3) and include them in the
+result (l6);
+(2) then, it adds to the result the sLP proposition for Md 2 in the
+initial state (l6), and the disjunction of the sLP proposition
+for Md 1 in the post state (l7) with a weak fields-quantified
+conjunction of the implications preserving permissibility in
+the pre and post states (l8–l10);
+(3) finally, checks that Md 1 does not modify the strong fields
+read by Md 2 : SFNIh (Md 1, Md 2 ) holds whenever
+h
+
+Md 1 ; Md 2 =⇒ 𝑒𝐻, (sf ′, sep, sf ′′ ), (𝑐˜ ′, 𝑐˜ ′′ ) and (𝜄, 𝑓 , r) ∈ sf ′′
+imply (𝜄, 𝑓 , w) ∉ sf ′ ,
+where r and w indicate a read and write access, respectively.
+SFNIh (Md 1, Md 2 ) captures that fact methods Md 1 and Md 2 do
+not interfere.
+Example 4.2. Consider the sequence of methods getBalance and
+accrueInterest in Listing 1 (abbreviated to g and a, respectively).
+We want to find the conditions under which a call of a can be
+anticipated w.r.t. a call of g in a (runtime) state Σ s.t. I(Σ).
+Let 𝑧 and 𝑦 be the unistantiated variables of the field balance
+and min_cash, respectively, and let 𝑖 be a shorthand for the formal
+parameter of a.
+The algorithm in Table 5 calculates the following values to populate the following list of propositions:
+𝑒𝑞𝑠 = (𝑧 + 𝑧/100 ∗ 𝑖 = 𝑧 + 𝑧/100 ∗ 𝑖, 𝑦 = 𝑦);
+𝑐𝑐 = (𝑧 ≥ 0, 𝑦 = 50);
+sLP(𝑒Σ, a) ==
+∀𝑧, 𝑦, 𝑖 . (𝑧 ≥ 0 ∧ 𝑦 = 50) ⇒ (𝑧 + 𝑧/100 ∗ 𝑖 ≥ 0 ∧ 𝑦 = 50);
+sLP(𝑒Σ ′′, g) =
+∀𝑧, 𝑦, 𝑖 . (𝑧+𝑧/100∗𝑖 ≥ 0∧𝑦 = 50) ⇒ (𝑧+𝑧/100∗𝑖 ≥ 0∧𝑦 = 50);
+SFNI(h, w, d) (we omit the remaining values).
+For any state Σ preserving its invariant, all invariants 𝑐 ∈ eqsΣ
+are SAT, as well as the invariants in 𝑐𝑐Σ.
+Next, we need to ensure that sLP(𝑒Σ, a) is SAT: this holds whenever 𝑖 ≥ −100. Since sLP(𝑒Σ ′′, g) is SAT, the disjunction is SAT as
+well; the last entry of the list is trivially SAT. Therefore, accrueInterest
+can be anticipated w.r.t. getBalance when the interest is greater
+or equal to −100.
+A JAVA IMPLEMENTATION
+
+To assess the use of Ant in real-life examples, we implemented a
+prototype that analyses Java Bytecode. It is a adaptation/generalization of the analysis presented in § 4 to cope with Java Bytecode
+instruction set (including conditions and jumps) and the virtual
+machine’s stack-based addressing mode. Weak fields an d field invariants are expressed through Java annotations. Preconditions
+have been passed over by if instructions.
+To generate and solve the equation system, we make use of
+CVC4 [8] by the means of the Servois [2] commutativity condition
+generator. The analysis generates an anticipation table (similar to
+Table 6) with the calls that may cause conflicts and, for each of
+these, the conditions on which a call may anticipate another. The
+
+table is implemented as a map from method signatures (𝑚 2 ) onto
+another map, whose keys are the signatures of the methods (𝑚 1 )
+with which 𝑚 2 conflicts and the values are the conditions (as Java
+lambda functions) for 𝑚 2 to anticipate 𝑚 1 . These lambda functions
+have, as parameters, the list of arguments of each method.
+We assessed how much time it takes to check anticipation. Although the implementation does not restrict the number of arguments of methods and the complexity of a query depends, naturally,
+on the complexity of the condition to check, our experimental results show querying the table takes less than 0.001 𝑚𝑠, several
+orders of magnitude lower than performing global synchronization.
+We conclude that it is feasible to use our approach at runtime.
+USE-CASES
+
+Table 6 presents statistics of applying model to common use-cases.
+For each, the number of weakly consistent fields, of field invariants,
+of methods, as well as the result of the Ant analysis: number of
+non-LP methods, of pairs of methods analyzed, of conflicts (noncommutative methods) detected, and possible anticipations.
+Account. Consider the example presented in Listing 1. Method
+init (i, for short) has been replaced by a Java constructor. Constructors are always LP and do not generate conflicts against methods
+invoked on the object itself. The results of the static analysis are:
+non-LP methods: transfer (t, for short), withdraw (w), and
+accrueInterest (a).
+non-commutative methods: when applied on the same account,
+deposit (d), withdraw, transfer and accrueInterest itself with accrueInterest.
+anticipatable methods: getBalance (g) can anticipate all method
+calls; deposit can anticipate calls of LP methods; to anticipate deposit w.r.t. a non-LP method call, the two accounts must differ; to anticipate accrueInterest, the interest must be greater or equal −100; and, when the call
+preceding accrueInterest is not a getBalance, the two
+accounts must differ.
+Auction. An Ebay-like auction where bid operations operate over
+a weak state, while the closing (and deciding the winner) operates
+over a strong state. Once the auction is closed, bid operations have
+no impact. The operations are: bid (b) to place a new bid (that
+must be higher than the current), currentBid (cb), that returns
+the value of current highest bid, close (c), that closes the auction,
+and winner (w) that returns the identifier of the winning bidder.
+close and bid only have side effects if the auction is open. An
+auction’s state comprises two replicated fields of type Bid (with
+the bidder and the bid): the weakly consistent current_bid and
+the strong winner indicating the auction’s winner (with a special
+value to indicate that the auction is still open). The results of the
+static analysis are:
+non-LP methods: none.
+non-commutative methods: bid with close, when applied upon
+the same auction.
+anticipatable methods: currentBid and bid can anticipate each
+other, close can anticipate itself, bid can anticipate itself
+because two consecutive bids produce the same outcome:
+
+the current bid becomes the highest of the two. All methods
+can anticipate any other method of different auctions.
+Counter. An eventually consistent Positive-Negative (PN) counter
+(like a PN-counter CRDT [11]), with operations to increment (i),
+decrement (d) and read (r). The results of the static analysis are:
+non-LP methods: none. non-commutative methods: none. anticipatable methods: all (as expected in a CRDT-like datatype).
+Register. A Last-Writer-Wins Register with two base operations:
+set(value, sequenceNumber, replicaId) and get(), and a second set operation set(value) that calls
+set(value, seqNumber++, localReplicaId).
+Each replica features three weak replicated fields: value, with the
+register’s value, seqNumber, with the sequence number of the last
+update to field value, and replicaId, with the identifier of the
+replica that emitted such update. localReplicaId is an not replicated constant field with the identifer of the local replica. The
+results of the static analysis are: non-LP methods: none. noncommutative methods: none. anticipatable methods: get can
+always anticipate, as well as be anticipated, set can anticipate itself.
+ANT AND COORDINATION SYNTHESIS
+
+In this section we present how Ant can contribute to the synthesis
+of the coordination level needed to execute a given method call.
+Strong consistency. A method call is a strongly consistent operation requiring distributed coordination if it either: (i) accesses a
+strong field, or (ii) breaks the invariant of at least one weak field (it
+is not LP). Examples of (i) are calls to method close of Auction. As
+expected, no method call that reads or writes the same auction can
+be anticipated w.r.t. close and vice-versa (see Table 6). The same
+happens to the calls that fall in category (ii) whenever an invariant
+may be broken. Examples are calls to withdraw of Account.
+Causal consistency. Under causal consistency, causally related
+method calls cannot anticipate one another. Causal relations and
+session guarantees are orthogonal to the notion of call anticipation,
+and should be treated upstream. Given two methods calls 𝑚𝑐 1 and
+𝑚𝑐 2 , if 𝑚𝑐 1 is under coordination and there are no causal dependencies between both calls, the table produced by Ant can be used
+to check if 𝑚𝑐 2 may anticipate 𝑚𝑐 1 .
+Eventual consistency. Every LP method call that only accesses
+weak fields and whose side effects do not depend on the effects
+of any other call may execute with eventual consistency. Trivial
+examples are calls to the methods from a weakly consistent PNcounter that features a weak single field.
+RELATED WORK
+
+In Kraska et al. [12], DCCT [22] and MixT [19], as in Ant, consistency guarantees are bound to data. However, in these proposals,
+the programmer must reason about the consistency levels, explicitly binding data to consistency categories, such as serializable or
+eventual, which contrasts with Ant’s weak. All of them preclude
+the coexistence of operations with different consistency levels over
+the same data. Moreover, no reference is made to which operations/transactions may execute concurrently, i.e. to call anticipation.
+
+𝑐
+
+Table 6: Statistics on the use-cases. 𝑚 2 −
+→ 𝑚 1 indicates that, given a sequence 𝑚 1 ; 𝑚 2 , method 𝑚 2 can anticipate 𝑚 1 when 𝑐 holds,
+thus giving rise to the sequence 𝑚 2 ; 𝑚 1 .
+Use-case
+
+# weak/
+# strong
+
+# invs
+
+# mtds
+
+Account
+
+1/1
+6
+
+#
+
+non-LP
+
+# pairs
+
+# conflicts
+
+# anticipations
+21
+a −−−−−−→ g, a −−−−−−−−−−−−−−−−−→ {d, t, w, a},
+0
+g−
+→ *, d −
+→ {d, g}, d −−−−−−−−−→ {t, w, a}
+b−
+→ cb, cb −
+→ *, c −
+→ c, b −
+→b
+*−
+→*
+g−
+→ *, * −
+→ g, s −
+→ s,
+
+𝑖 ≥−100
+
+this1 ̸  this2 ∧𝑖 2 ≥−100
+
+this1 ̸ this2
+
+Auction
+Counter
+Register
+
+1/1
+1/0
+3/0
+0
+4
+2
+0
+Red-blue consistency [6] colors operations, red or blue, according to whether they require global coordination or not. Thus, contrarily to Ant, consistency guarantees are attached to operations.
+Although the work provides a set of rules for labeling operations
+blue, it is up to the programmer to reason about operation commutativity and invariant violation. Gotsman et al. [5] go a step
+further, providing a proof rule for assessing if a choice of consistency guarantees for a set of operations over a replicated state is
+sufficient to preserve the data integrity invariant. Also, in red-blue,
+all operations that are not globally commutative must be totally ordered. Partial Order-Restrictions consistency (Olisipo) [18] tackles
+this issue by allowing for the definition of a set of restrictions that
+must be met in all partial orders of the operations. Ant establishes
+partial order relationships by design, as operations operating over
+different data objects do not conflict with each other.
+Sieve [7] automates the choice of the red-blue consistency levels
+for operations over replicated databases. Programmers need to annotate the database’s schema with the CRDTs [11] that encapsulate
+the merge semantics of a table or of a table field. Sieve and Olisipo
+use Weakest Pre-condition Calculi to find restrictions for preserving
+invariants, and use commutativity analysis to compute which operations may execute concurrently. To the best of our knowledge, as
+in Hamsaz, the output is true or false, which is a weaker result than
+our static analysis that is able to output parameterized conditions
+that may be instantiated at runtime to check for conflicts.
+Quelea [21] and Indigo [13] propose contract-based approaches
+to specify consistency requirements. Given the specifications both
+strategies identify which operations may, or may not, safely execute
+concurrently. In Quelea, the programmer must reason about the
+effects of each operation/transaction and how these interfere with
+each other. Failing to identify a conflict will result in a contract
+that, although correct, does not reflect the necessary constraints.
+Ant assumes some of this burden, inferring the effects from the
+annotated data and detecting possible conflicts by conducting a
+static analysis. In Indigo, the programmer must provide the list
+of invariants over the application’s state and a list of effects per
+operation. The programmer does not have to reason about effect
+interference, but rather about which are the effects produced by
+each operation. A single missing or miswritten effect may render the
+specification incorrect. Ant has thus the advantage of automating
+the inference of the effects and performing the subsequent invariant
+violation and conflict analyses. On the other hand, Indigo allows to
+specify invariants that relate multiple data items.
+AutoGr [10] provides an automated way of geo-replicate nonreplicated applications, relying on the framework Olisipo and using
+6
+the static analysis tool Rigi to automatically identify potentially
+conflicting operations. Ant works directly on the source code and
+also defines a static analysis, but not only to detect conflicts: it
+provides the run-time with information of which operations may
+be anticipated as no coordination is required.
+CONCLUSIONS
+
+This paper presents Ant, a novel language-based call anticipation
+static analysis for applications with mixed consistency. The main
+notions are formally defined in § 4. We develop Ant over OOlong,
+an object-oriented core programming calculus, rigorously defined
+and mechanized to ensure type safety. The static analysis we devise
+and present herein infers the effects of the language’s methods, and
+uses such effects to check which methods are locally permissible,
+which pairs of methods commute and, ultimately, in which conditions method calls may be anticipated. All these notions were
+implemented and type-checked in a functional language and are
+publicly available.
+Our proposal distinguishes itself from the state-of-the-art by enabling the anticipation of method calls: it provides, for each pair of
+methods, a system of inequalities over objects’ fields and methods’
+parameters that must be satisfied at runtime. To illustrate the applicability and expressiveness of our approach, § 6 presents the output
+of the analysis for a set of significant examples commonly used in
+the literature. The results demonstrate the viability of the methodology we devised. Moreover, a Java implementation (presented in
+§ 5) further strengths the usability of the analysis.
+Finally, we discuss how Ant can be used in the synthesis of
+the coordination required for each method call, so that the modifications to replicated state comply to the consistency annotations
+provided in the source code (see § 7).
+In future work, we will mechanise the static analysis soundness,
+and add constructs like conditionals and loops to the language.
