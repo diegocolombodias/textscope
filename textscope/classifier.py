@@ -243,6 +243,17 @@ def train_classifier(
         fpr = fp / (fp + tn) if (fp + tn) else 0.0
         return {"recall": recall, "fpr": fpr}
 
+    # DeBERTa-v2/v3's disentangled attention is numerically unstable
+    # under mixed precision: fp16 hits "Attempting to unscale FP16
+    # gradients" (its loss-scaling GradScaler chokes on some parameter
+    # shape in the relative-position bias); bf16 avoids that crash but
+    # trades away enough mantissa precision to silently diverge instead
+    # (eval_loss -> NaN, a collapsed classifier). This is a known
+    # instability in that architecture, not something specific to this
+    # dataset — train it in plain fp32. The backbone is small (~86M
+    # params) so the extra cost is a couple of minutes, not a problem.
+    use_mixed_precision = device == "cuda" and "deberta" not in base_model.lower()
+
     args = TrainingArguments(
         output_dir=str(Path(out_dir) / "_checkpoints"),
         num_train_epochs=epochs,
@@ -253,13 +264,7 @@ def train_classifier(
         logging_steps=50,
         learning_rate=2e-5,
         weight_decay=0.01,
-        # bf16, not fp16: DeBERTa-v3's disentangled-attention relative
-        # position embeddings hit "Attempting to unscale FP16 gradients"
-        # under fp16's loss-scaling GradScaler on some parameter shapes.
-        # bf16 has fp32's exponent range, so it needs no loss scaling and
-        # sidesteps the bug entirely; every CUDA GPU new enough to be
-        # running this (Ampere+) supports it natively.
-        bf16=(device == "cuda"),
+        fp16=use_mixed_precision,
         report_to=[],
     )
 
