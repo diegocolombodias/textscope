@@ -168,6 +168,7 @@ def train_classifier(
     batch_size: int = 16,
     max_hc3_per_class: Optional[int] = 15000,
     device: str = "cuda",
+    learning_rate: Optional[float] = None,
 ) -> dict:
     """
     Fine-tune `base_model` as a binary human/AI sequence classifier and
@@ -252,7 +253,18 @@ def train_classifier(
     # instability in that architecture, not something specific to this
     # dataset — train it in plain fp32. The backbone is small (~86M
     # params) so the extra cost is a couple of minutes, not a problem.
-    use_mixed_precision = device == "cuda" and "deberta" not in base_model.lower()
+    is_deberta = "deberta" in base_model.lower()
+    use_mixed_precision = device == "cuda" and not is_deberta
+
+    if learning_rate is None:
+        # DeBERTa-v2/v3's disentangled attention is a known-fragile
+        # architecture to fine-tune: starting at full LR from step 0
+        # (no warmup) reliably blows up grad_norm to NaN a bit into
+        # training, independent of fp16 vs bf16 vs fp32 — confirmed
+        # here across all three. Halving the LR and adding warmup below
+        # is the standard community fix. RoBERTa has no such issue and
+        # keeps the original rate.
+        learning_rate = 1e-5 if is_deberta else 2e-5
 
     args = TrainingArguments(
         output_dir=str(Path(out_dir) / "_checkpoints"),
@@ -262,7 +274,9 @@ def train_classifier(
         eval_strategy="epoch",
         save_strategy="no",
         logging_steps=50,
-        learning_rate=2e-5,
+        learning_rate=learning_rate,
+        warmup_ratio=0.06,
+        max_grad_norm=1.0,
         weight_decay=0.01,
         fp16=use_mixed_precision,
         report_to=[],

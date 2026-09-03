@@ -128,6 +128,7 @@ def cmd_train_classifier(args) -> None:
         epochs=args.epochs,
         batch_size=args.batch_size,
         device=args.device,
+        learning_rate=args.learning_rate,
     )
     print(f"\nSaved to {args.out}")
     print("Held-out test metrics:", metrics)
@@ -212,6 +213,9 @@ def main() -> None:
     t.add_argument("--epochs", type=int, default=2)
     t.add_argument("--batch-size", type=int, default=16)
     t.add_argument("--device", default="cuda")
+    t.add_argument("--learning-rate", type=float, default=None,
+                    help="default: 2e-5, or 1e-5 for deberta-family "
+                         "base models (see train_classifier docstring)")
     t.set_defaults(func=cmd_train_classifier)
 
     c = sub.add_parser("calibrate", help="build a reference corpus")
