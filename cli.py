@@ -34,7 +34,7 @@ from textscope.stylometry import analyze_style                  # noqa: E402
 from textscope import calibration                               # noqa: E402
 
 
-def _load_scorer(model_path: str | None, device: str):
+def _load_scorer(model_path: str | None, device: str, dtype: str | None = None):
     if not model_path:
         return None
     try:
@@ -46,7 +46,7 @@ def _load_scorer(model_path: str | None, device: str):
             "Or omit --model to run the stylometric analysis only."
         )
     print(f"Loading model from {model_path} ... ", end="", flush=True)
-    scorer = LocalScorer(model_path=model_path, device=device)
+    scorer = LocalScorer(model_path=model_path, device=device, dtype=dtype)
     print("done.")
     return scorer
 
@@ -82,7 +82,7 @@ def _load_classifier(model_path: str | None, device: str):
 
 def cmd_analyze(args) -> None:
     text = Path(args.path).read_text(encoding="utf-8")
-    scorer = _load_scorer(args.model, args.device)
+    scorer = _load_scorer(args.model, args.device, args.dtype)
     classifier = _load_classifier(args.classifier, args.classifier_device)
 
     ref = calibration.ReferenceStats.load(args.reference) if args.reference else None
@@ -145,7 +145,7 @@ def cmd_calibrate(args) -> None:
     if not paths:
         sys.exit("No files matched.")
 
-    scorer = _load_scorer(args.model, args.device)
+    scorer = _load_scorer(args.model, args.device, args.dtype)
 
     rows = []
     for i, p in enumerate(paths, 1):
@@ -178,6 +178,8 @@ def main() -> None:
     a.add_argument("--model", default=None,
                    help="path to a local HF causal LM directory")
     a.add_argument("--device", default="cpu")
+    a.add_argument("--dtype", default=None,
+                   help="e.g. float16/bfloat16 for large models (default: model's own, usually float32)")
     a.add_argument("--reference", default=None,
                    help="reference.json from the calibrate command")
     a.add_argument("--json", action="store_true")
@@ -217,6 +219,7 @@ def main() -> None:
     c.add_argument("--lang", default="en", choices=["en", "pt"])
     c.add_argument("--model", default=None)
     c.add_argument("--device", default="cpu")
+    c.add_argument("--dtype", default=None)
     c.add_argument("--out", default="reference.json")
     c.add_argument("--note", default="")
     c.set_defaults(func=cmd_calibrate)

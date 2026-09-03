@@ -201,6 +201,8 @@ def main() -> None:
     ap.add_argument("--model", default=None,
                     help="path to a local HF causal LM directory")
     ap.add_argument("--device", default="cpu")
+    ap.add_argument("--dtype", default=None,
+                    help="e.g. float16/bfloat16 for large models")
     ap.add_argument("--reference", default=None)
     ap.add_argument("--classifier", default=None,
                     help="path to a fine-tuned checkpoint from "
@@ -215,7 +217,7 @@ def main() -> None:
     if args.model:
         from textscope.perplexity import LocalScorer
         print(f"Loading {args.model} ...")
-        SCORER = LocalScorer(model_path=args.model, device=args.device)
+        SCORER = LocalScorer(model_path=args.model, device=args.device, dtype=args.dtype)
 
     if args.reference:
         REFERENCE = calibration.ReferenceStats.load(args.reference)

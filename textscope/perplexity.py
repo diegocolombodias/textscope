@@ -77,6 +77,7 @@ class LocalScorer:
         model_path: str = "gpt2",
         device: str = "cpu",
         max_length: Optional[int] = None,
+        dtype: Optional[str] = None,
     ) -> None:
         # Imported lazily so the stylometric half of the tool works
         # without torch installed.
@@ -86,11 +87,18 @@ class LocalScorer:
         self._torch = torch
         self.device = device
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.model = AutoModelForCausalLM.from_pretrained(model_path)
+        load_kwargs = {}
+        if dtype:
+            # fp16/bf16 for multi-billion-parameter models — fp32 doubles
+            # VRAM for no accuracy benefit on a scoring-only (no gradient)
+            # workload. Irrelevant for small models like gpt2-large.
+            load_kwargs["torch_dtype"] = getattr(torch, dtype)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
         self.model.to(device)
         self.model.eval()
         self.max_length = max_length or getattr(
-            self.model.config, "n_positions", 1024
+            self.model.config, "n_positions",
+            getattr(self.model.config, "max_position_embeddings", 1024),
         )
 
     def score(self, text: str) -> PerplexityReport:
