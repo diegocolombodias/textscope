@@ -266,6 +266,14 @@ def train_classifier(
         # keeps the original rate.
         learning_rate = 1e-5 if is_deberta else 2e-5
 
+    # This transformers version's TrainingArguments dropped the
+    # warmup_ratio convenience kwarg (warmup_steps only) — compute the
+    # step count for the same ~6% warmup by hand.
+    import math
+    steps_per_epoch = math.ceil(len(train_texts) / batch_size)
+    total_steps = steps_per_epoch * epochs
+    warmup_steps = max(1, int(0.06 * total_steps))
+
     args = TrainingArguments(
         output_dir=str(Path(out_dir) / "_checkpoints"),
         num_train_epochs=epochs,
@@ -275,7 +283,7 @@ def train_classifier(
         save_strategy="no",
         logging_steps=50,
         learning_rate=learning_rate,
-        warmup_ratio=0.06,
+        warmup_steps=warmup_steps,
         max_grad_norm=1.0,
         weight_decay=0.01,
         fp16=use_mixed_precision,
