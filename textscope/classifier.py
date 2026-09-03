@@ -90,12 +90,13 @@ def load_training_examples(
     reference_corpus_dir: str,
     ai_samples_path: str,
     max_hc3_per_class: Optional[int] = 15000,
-    academic_ai_oversample: int = 2,
     seed: int = 0,
 ) -> list[dict]:
     """
-    Assemble (text, label) examples from three sources. label: 0 = human,
-    1 = AI.
+    Assemble (text, label) examples from three sources, each row also
+    tagged with "source" so train_classifier can split before
+    oversampling instead of after (see its docstring for why that
+    order matters). label: 0 = human, 1 = AI.
 
       * HC3 ("Hello-SimpleAI/HC3", all.jsonl): real human vs real ChatGPT
         answers to the same questions across several domains (open QA,
@@ -110,11 +111,7 @@ def load_training_examples(
         219 real academic-style paragraphs from three different LLMs
         (Claude, Gemini, Kimi — see reference_corpus/ai_samples_*.jsonl,
         combined here) — see the module docstring for their limits.
-        Lightly oversampled (default x2, versus x8 when this file held
-        ~40 hand-written stand-ins) to land in the same ballpark as the
-        ~588 human-academic chunks reference_corpus/txt/*.txt produces;
-        with real volume behind it now, heavy duplication is no longer
-        needed to make this class visible during training.
+        No oversampling happens here anymore — see train_classifier.
     """
     examples: list[dict] = []
     rng = random.Random(seed)
@@ -131,7 +128,7 @@ def load_training_examples(
                 continue
             if max_hc3_per_class is not None and human_count >= max_hc3_per_class:
                 continue
-            examples.append({"text": ans, "label": 0})
+            examples.append({"text": ans, "label": 0, "source": "hc3"})
             human_count += 1
         for ans in row.get("chatgpt_answers") or []:
             ans = " ".join(ans.split())
@@ -139,29 +136,30 @@ def load_training_examples(
                 continue
             if max_hc3_per_class is not None and ai_count >= max_hc3_per_class:
                 continue
-            examples.append({"text": ans, "label": 1})
+            examples.append({"text": ans, "label": 1, "source": "hc3"})
             ai_count += 1
 
     n_paper_chunks = 0
     for path in sorted(Path(reference_corpus_dir).glob("*.txt")):
         text = path.read_text(encoding="utf-8")
         for chunk in _chunk_words(text):
-            examples.append({"text": chunk, "label": 0})
+            examples.append({"text": chunk, "label": 0, "source": "paper"})
             n_paper_chunks += 1
 
-    academic_ai: list[dict] = []
+    n_academic_ai = 0
     with open(ai_samples_path, encoding="utf-8") as f:
         for line in f:
             row = json.loads(line)
-            academic_ai.append({"text": row["text"], "label": 1})
-    examples.extend(academic_ai * academic_ai_oversample)
+            examples.append({
+                "text": row["text"], "label": 1, "source": "academic_ai",
+            })
+            n_academic_ai += 1
 
     print(
         f"Training examples: {human_count} HC3-human, {ai_count} HC3-AI, "
         f"{n_paper_chunks} reference-paper chunks (human), "
-        f"{len(academic_ai)} academic-AI x{academic_ai_oversample} "
-        f"oversample = {len(academic_ai) * academic_ai_oversample} "
-        f"(total {len(examples)})"
+        f"{n_academic_ai} academic-AI (oversampled after the split, not "
+        f"here) (total {len(examples)})"
     )
 
     rng.shuffle(examples)
@@ -191,6 +189,16 @@ def train_classifier(
     see Turnitin's own whitepaper for why accuracy is a bad metric here
     (a classifier that always predicts "human" scores ~50% accuracy on a
     balanced set here and would be useless).
+
+    `academic_ai_oversample` is applied to the *training* split only,
+    after the train/val/test split — never before. Oversampling before
+    splitting (the original implementation) put literal duplicate copies
+    of the same paragraph on both sides of the split, so "held-out"
+    recall partly measured memorization of a paragraph the model had
+    already seen verbatim in training, not generalization. That bug
+    produced wildly unstable eval numbers as the oversample factor
+    changed (recall/fpr collapsing to 0/0 at one setting and 1/1 at
+    another) before it was found and fixed here.
     """
     import numpy as np
     import torch
@@ -206,20 +214,33 @@ def train_classifier(
     examples = load_training_examples(
         hc3_path, reference_corpus_dir, ai_samples_path,
         max_hc3_per_class=max_hc3_per_class,
-        academic_ai_oversample=academic_ai_oversample,
     )
     texts = [e["text"] for e in examples]
     labels = [e["label"] for e in examples]
+    sources = [e["source"] for e in examples]
 
-    train_texts, temp_texts, train_labels, temp_labels = train_test_split(
-        texts, labels, test_size=0.2, random_state=0, stratify=labels
+    (train_texts, temp_texts, train_labels, temp_labels,
+     train_sources, _temp_sources) = train_test_split(
+        texts, labels, sources, test_size=0.2, random_state=0,
+        stratify=labels,
     )
     val_texts, test_texts, val_labels, test_labels = train_test_split(
         temp_texts, temp_labels, test_size=0.5, random_state=0,
         stratify=temp_labels,
     )
-    print(f"Split: {len(train_texts)} train / {len(val_texts)} val / "
-          f"{len(test_texts)} test")
+
+    if academic_ai_oversample > 1:
+        extra_texts, extra_labels = [], []
+        for t, lbl, src in zip(train_texts, train_labels, train_sources):
+            if src == "academic_ai":
+                extra_texts.extend([t] * (academic_ai_oversample - 1))
+                extra_labels.extend([lbl] * (academic_ai_oversample - 1))
+        train_texts = train_texts + extra_texts
+        train_labels = train_labels + extra_labels
+
+    print(f"Split: {len(train_texts)} train (oversample x"
+          f"{academic_ai_oversample} applied here) / {len(val_texts)} "
+          f"val / {len(test_texts)} test")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model)
 
