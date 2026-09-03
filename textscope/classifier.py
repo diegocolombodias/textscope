@@ -253,7 +253,13 @@ def train_classifier(
         logging_steps=50,
         learning_rate=2e-5,
         weight_decay=0.01,
-        fp16=(device == "cuda"),
+        # bf16, not fp16: DeBERTa-v3's disentangled-attention relative
+        # position embeddings hit "Attempting to unscale FP16 gradients"
+        # under fp16's loss-scaling GradScaler on some parameter shapes.
+        # bf16 has fp32's exponent range, so it needs no loss scaling and
+        # sidesteps the bug entirely; every CUDA GPU new enough to be
+        # running this (Ampere+) supports it natively.
+        bf16=(device == "cuda"),
         report_to=[],
     )
 
