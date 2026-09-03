@@ -126,12 +126,17 @@ tool against.
   training corpus spanning two decades of real student writing and
   dozens of LLM prompting strategies. This ships with the public **HC3**
   corpus (real human vs. real ChatGPT answers, general-domain) plus the
-  15 papers in `reference_corpus/` (human, academic) plus ~40 academic
-  paragraphs this project's own coding assistant wrote by hand as a
-  stand-in for "AI writing in the papers register" — there was no API
-  access to a modern commercial LLM at training time to generate that
-  side of the data properly. Treat the academic-register half of this
-  classifier's judgment accordingly.
+  15 papers in `reference_corpus/` (human, academic) plus 219 academic
+  paragraphs written by three different LLMs (Claude, Gemini, Kimi —
+  see `reference_corpus/ai_samples_*.jsonl`) as the "AI writing in the
+  papers register" class. An earlier version of this file used ~40
+  hand-written stand-in paragraphs instead; a saturation test (see the
+  capacitação report) found that classifier had essentially no
+  resolution within formal academic prose, returning ~94.6% for every
+  academic paragraph tested regardless of content. Real model output
+  should generalize better, but it is still only three models' worth of
+  samples. Treat the academic-register half of this classifier's
+  judgment accordingly.
 * It has not been independently validated. Training prints and saves
   held-out **recall** and **false-positive rate** (`eval_metrics.json`
   next to the checkpoint) — deliberately not accuracy, for the same

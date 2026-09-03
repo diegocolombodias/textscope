@@ -19,13 +19,20 @@ Read this before trusting anything it outputs:
   * Its training data is small and mixed-provenance relative to what a
     commercial vendor uses: the public HC3 corpus (real human answers vs
     real ChatGPT answers, general-domain) plus the 15 papers in
-    reference_corpus/ (human, academic) plus a few dozen academic-style
-    paragraphs this project's own assistant wrote as a stand-in for
-    "AI writing in the papers register" — there was no API access to a
-    modern commercial LLM at training time to generate that class
-    properly. Turnitin's published whitepaper describes a training
-    corpus spanning two decades of real student writing and dozens of
-    LLM prompting strategies; this is nowhere near that scale.
+    reference_corpus/ (human, academic) plus 219 academic-style
+    paragraphs actually written by three different LLMs (Claude, Gemini,
+    Kimi — see reference_corpus/ai_samples_*.jsonl) as the "AI writing in
+    the papers register" class. This replaced an earlier version of this
+    file that used ~40 hand-written stand-in paragraphs instead of real
+    model output; a saturation test (documented in this project's
+    capacitação report) showed the hand-written-stand-in classifier had
+    essentially zero resolution within the formal-academic register,
+    returning ~94.6% for every academic paragraph tested regardless of
+    content or phrasing. Real LLM output should generalize better, but
+    it's still three models' worth of samples, not the "two decades of
+    real student writing and dozens of LLM prompting strategies" Turnitin's
+    published whitepaper describes as its training corpus — nowhere near
+    that scale or diversity.
   * It has not been independently validated. `train_classifier()` prints
     and saves held-out recall and false-positive rate — by the same two
     metrics Turnitin's whitepaper uses, deliberately not "accuracy" (see
@@ -83,7 +90,7 @@ def load_training_examples(
     reference_corpus_dir: str,
     ai_samples_path: str,
     max_hc3_per_class: Optional[int] = 15000,
-    academic_ai_oversample: int = 8,
+    academic_ai_oversample: int = 2,
     seed: int = 0,
 ) -> list[dict]:
     """
@@ -100,11 +107,14 @@ def load_training_examples(
         conversational; this adds the dense academic register TextScope
         is actually used on.
       * ai_samples_path (reference_corpus/ai_academic_samples.jsonl):
-        hand-written academic-style AI paragraphs — see the module
-        docstring for why these exist and their limits. Oversampled
-        (default x8) since there are only a few dozen of them against
-        thousands of HC3 examples per class; this is duplication, not
-        augmentation, and is not a substitute for real held-out variety.
+        219 real academic-style paragraphs from three different LLMs
+        (Claude, Gemini, Kimi — see reference_corpus/ai_samples_*.jsonl,
+        combined here) — see the module docstring for their limits.
+        Lightly oversampled (default x2, versus x8 when this file held
+        ~40 hand-written stand-ins) to land in the same ballpark as the
+        ~588 human-academic chunks reference_corpus/txt/*.txt produces;
+        with real volume behind it now, heavy duplication is no longer
+        needed to make this class visible during training.
     """
     examples: list[dict] = []
     rng = random.Random(seed)
