@@ -129,6 +129,7 @@ def cmd_train_classifier(args) -> None:
         batch_size=args.batch_size,
         device=args.device,
         learning_rate=args.learning_rate,
+        adam_epsilon=args.adam_epsilon,
     )
     print(f"\nSaved to {args.out}")
     print("Held-out test metrics:", metrics)
@@ -216,6 +217,8 @@ def main() -> None:
     t.add_argument("--learning-rate", type=float, default=None,
                     help="default: 2e-5, or 1e-5 for deberta-family "
                          "base models (see train_classifier docstring)")
+    t.add_argument("--adam-epsilon", type=float, default=None,
+                    help="default: 1e-8 (transformers' own default)")
     t.set_defaults(func=cmd_train_classifier)
 
     c = sub.add_parser("calibrate", help="build a reference corpus")

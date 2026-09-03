@@ -169,6 +169,7 @@ def train_classifier(
     max_hc3_per_class: Optional[int] = 15000,
     device: str = "cuda",
     learning_rate: Optional[float] = None,
+    adam_epsilon: Optional[float] = None,
 ) -> dict:
     """
     Fine-tune `base_model` as a binary human/AI sequence classifier and
@@ -258,13 +259,16 @@ def train_classifier(
 
     if learning_rate is None:
         # DeBERTa-v2/v3's disentangled attention is a known-fragile
-        # architecture to fine-tune: starting at full LR from step 0
-        # (no warmup) reliably blows up grad_norm to NaN a bit into
-        # training, independent of fp16 vs bf16 vs fp32 — confirmed
-        # here across all three. Halving the LR and adding warmup below
-        # is the standard community fix. RoBERTa has no such issue and
-        # keeps the original rate.
+        # architecture to fine-tune: grad_norm reliably blows up to NaN
+        # partway through training, independent of fp16 vs bf16 vs
+        # fp32. Warmup + a halved LR (below) is the standard first fix
+        # cited for this — confirmed NOT sufficient on its own here, so
+        # treat 1e-5 as a starting point to combine with a lower
+        # --learning-rate and/or --adam-epsilon override, not a fix by
+        # itself. RoBERTa has no such issue and keeps the original rate.
         learning_rate = 1e-5 if is_deberta else 2e-5
+    if adam_epsilon is None:
+        adam_epsilon = 1e-8  # transformers' own default
 
     # This transformers version's TrainingArguments dropped the
     # warmup_ratio convenience kwarg (warmup_steps only) — compute the
@@ -283,6 +287,7 @@ def train_classifier(
         save_strategy="no",
         logging_steps=50,
         learning_rate=learning_rate,
+        adam_epsilon=adam_epsilon,
         warmup_steps=warmup_steps,
         max_grad_norm=1.0,
         weight_decay=0.01,
