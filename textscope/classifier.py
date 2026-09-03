@@ -180,6 +180,7 @@ def train_classifier(
     device: str = "cuda",
     learning_rate: Optional[float] = None,
     adam_epsilon: Optional[float] = None,
+    academic_ai_oversample: int = 2,
 ) -> dict:
     """
     Fine-tune `base_model` as a binary human/AI sequence classifier and
@@ -205,6 +206,7 @@ def train_classifier(
     examples = load_training_examples(
         hc3_path, reference_corpus_dir, ai_samples_path,
         max_hc3_per_class=max_hc3_per_class,
+        academic_ai_oversample=academic_ai_oversample,
     )
     texts = [e["text"] for e in examples]
     labels = [e["label"] for e in examples]

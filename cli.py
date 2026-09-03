@@ -130,6 +130,7 @@ def cmd_train_classifier(args) -> None:
         device=args.device,
         learning_rate=args.learning_rate,
         adam_epsilon=args.adam_epsilon,
+        academic_ai_oversample=args.academic_ai_oversample,
     )
     print(f"\nSaved to {args.out}")
     print("Held-out test metrics:", metrics)
@@ -219,6 +220,11 @@ def main() -> None:
                          "base models (see train_classifier docstring)")
     t.add_argument("--adam-epsilon", type=float, default=None,
                     help="default: 1e-8 (transformers' own default)")
+    t.add_argument("--academic-ai-oversample", type=int, default=2,
+                    help="repeat factor for ai_samples_path examples "
+                         "(default: 2; raise if the minority class "
+                         "isn't getting enough gradient signal — see "
+                         "load_training_examples docstring)")
     t.set_defaults(func=cmd_train_classifier)
 
     c = sub.add_parser("calibrate", help="build a reference corpus")
