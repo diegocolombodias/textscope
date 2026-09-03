@@ -20,11 +20,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import gradio as gr  # noqa: E402
 
-from textscope.report import build_report, DISCLAIMER  # noqa: E402
+from textscope.report import build_report, CLASSIFIER_DISCLAIMER, DISCLAIMER  # noqa: E402
 from textscope import calibration  # noqa: E402
 
 SCORER = None
 REFERENCE = None
+CLASSIFIER = None
 
 
 BADGE_INK_LIGHT = "#52514e"  # secondary ink, light surface
@@ -94,7 +95,9 @@ def analyze(text: str, lang: str) -> tuple[str, str, str]:
     if not text.strip():
         return "<p>Paste some text.</p>", "", ""
 
-    rep = build_report(text, lang=lang, scorer=SCORER, reference=REFERENCE)
+    rep = build_report(
+        text, lang=lang, scorer=SCORER, reference=REFERENCE, classifier=CLASSIFIER
+    )
 
     blocks = []
     for e in rep["sentences"]:
@@ -160,6 +163,16 @@ def analyze(text: str, lang: str) -> tuple[str, str, str]:
                       f"({REFERENCE.n_documents} docs)", ""]
         lines += calibration.interpret(z)
 
+    if "ai_probability" in rep:
+        ai = rep["ai_probability"]
+        lines += [
+            "", "### 🔴 AI-writing probability (learned classifier)", "",
+            f"**P(AI-written) = {ai['ai_probability']:.1%}** "
+            f"({ai['n_windows']} window(s) averaged)",
+            "",
+            CLASSIFIER_DISCLAIMER.replace("\n", "  \n"),
+        ]
+
     lines += ["", "---", "", DISCLAIMER.replace("\n", "  \n")]
 
     rw = rep["rewrite"]
@@ -182,13 +195,18 @@ def analyze(text: str, lang: str) -> tuple[str, str, str]:
 
 
 def main() -> None:
-    global SCORER, REFERENCE
+    global SCORER, REFERENCE, CLASSIFIER
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=None,
                     help="path to a local HF causal LM directory")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--reference", default=None)
+    ap.add_argument("--classifier", default=None,
+                    help="path to a fine-tuned checkpoint from "
+                         "'cli.py train-classifier' — read "
+                         "textscope/classifier.py before using this")
+    ap.add_argument("--classifier-device", default="cpu")
     ap.add_argument("--port", type=int, default=7860)
     ap.add_argument("--host", default="127.0.0.1",
                     help="bind address (use 0.0.0.0 inside a container)")
@@ -201,6 +219,13 @@ def main() -> None:
 
     if args.reference:
         REFERENCE = calibration.ReferenceStats.load(args.reference)
+
+    if args.classifier:
+        from textscope.classifier import ClassifierScorer
+        print(f"Loading classifier from {args.classifier} ...")
+        CLASSIFIER = ClassifierScorer(
+            model_path=args.classifier, device=args.classifier_device
+        )
 
     if SCORER is not None:
         heat_note = (

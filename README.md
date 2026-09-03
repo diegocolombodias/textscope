@@ -31,6 +31,11 @@ against near-zero on native writing. A tool built on these features
 inherits that bias no matter how it is packaged. Emitting a percentage
 would launder a stylistic measurement into a claim about a person.
 
+There is exactly one opt-in exception to this, built on explicit
+request and never on by default — see *Optional: a black-box
+classifier*, below. Everything above still describes the rest of the
+tool.
+
 ## Install
 
     pip install -r requirements.txt          # stylometry only
@@ -103,6 +108,70 @@ to look, not what you'll find when you get there. Red is not "AI." Blue is
 not "definitely human." A dense related-work paragraph can turn blue for
 the same reason a second-language author can turn red — see *What it does
 not do*, above.
+
+## Optional: a black-box classifier (the one exception)
+
+`textscope/classifier.py` fine-tunes a transformer (default `roberta-base`)
+as a supervised human-vs-AI classifier and reports a single probability —
+the same kind of thing Turnitin, GPTZero, and similar commercial tools
+ship, and the exact thing the rest of this README says the tool refuses
+to do. It exists as a separate, clearly labeled module, off by default,
+built on explicit request to have something to compare the rest of this
+tool against.
+
+**Read this before using it, not after:**
+
+* Its training data is small and mixed-provenance next to what a
+  commercial vendor uses. Turnitin's public whitepaper describes a
+  training corpus spanning two decades of real student writing and
+  dozens of LLM prompting strategies. This ships with the public **HC3**
+  corpus (real human vs. real ChatGPT answers, general-domain) plus the
+  15 papers in `reference_corpus/` (human, academic) plus ~40 academic
+  paragraphs this project's own coding assistant wrote by hand as a
+  stand-in for "AI writing in the papers register" — there was no API
+  access to a modern commercial LLM at training time to generate that
+  side of the data properly. Treat the academic-register half of this
+  classifier's judgment accordingly.
+* It has not been independently validated. Training prints and saves
+  held-out **recall** and **false-positive rate** (`eval_metrics.json`
+  next to the checkpoint) — deliberately not accuracy, for the same
+  reason Turnitin's whitepaper gives: a classifier that always guesses
+  "human" scores ~50% "accuracy" on a balanced set and is worthless.
+  **Read that file before trusting a single number this produces.**
+* It inherits every false-positive risk described above — non-native
+  English, formal or technical prose, unusual domains — and hides it
+  behind one opaque number instead of a z-score you can inspect against
+  a corpus you chose yourself.
+
+### Train it
+
+    pip install torch transformers datasets scikit-learn accelerate
+    # Download HC3 once (bypasses `datasets.load_dataset`, whose loader
+    # script HC3 still ships is no longer supported by recent `datasets`):
+    python -c "from huggingface_hub import hf_hub_download as d; \
+        print(d('Hello-SimpleAI/HC3', 'all.jsonl', repo_type='dataset'))"
+
+    python cli.py train-classifier --hc3 /path/to/all.jsonl \
+        --out models/textscope-classifier --device cuda
+
+This fine-tunes for 2 epochs on ~31k examples (HC3 + `reference_corpus/`
++ `reference_corpus/ai_academic_samples.jsonl`) and saves the checkpoint,
+`eval_metrics.json`, and a `TRAINING_NOTE.md` to `--out`. Takes roughly
+10–15 minutes on a single consumer GPU (6GB was enough for the default
+`roberta-base`); CPU-only works but is much slower. To improve on the
+shipped defaults, the highest-leverage change is replacing
+`ai_academic_samples.jsonl` with real output from a modern LLM in the
+academic register you actually care about — see the module docstring.
+
+### Use it
+
+    python cli.py analyze paper.txt --classifier models/textscope-classifier
+    python app.py --classifier models/textscope-classifier   # web UI too
+
+Adds a `P(AI-written)` line to the report (and to `--json` output, under
+`ai_probability`), for long documents averaged over ~220-word windows.
+It comes with its own on-the-spot disclaimer every time it prints —
+that disclaimer is not decorative.
 
 ## Using it fairly
 

@@ -63,9 +63,27 @@ def _doc_features(text: str, lang: str, scorer) -> dict[str, float]:
     return feats
 
 
+def _load_classifier(model_path: str | None, device: str):
+    if not model_path:
+        return None
+    try:
+        from textscope.classifier import ClassifierScorer
+    except ImportError as exc:
+        sys.exit(
+            f"Could not import the classifier backend ({exc}).\n"
+            "Install it with:  pip install torch transformers\n"
+            "Or omit --classifier to run without it."
+        )
+    print(f"Loading classifier from {model_path} ... ", end="", flush=True)
+    scorer = ClassifierScorer(model_path=model_path, device=device)
+    print("done.")
+    return scorer
+
+
 def cmd_analyze(args) -> None:
     text = Path(args.path).read_text(encoding="utf-8")
     scorer = _load_scorer(args.model, args.device)
+    classifier = _load_classifier(args.classifier, args.classifier_device)
 
     ref = calibration.ReferenceStats.load(args.reference) if args.reference else None
 
@@ -73,6 +91,7 @@ def cmd_analyze(args) -> None:
         text, lang=args.lang, scorer=scorer,
         include_rewrite=not args.no_rewrite,
         reference=ref,
+        classifier=classifier,
     )
 
     if args.json:
@@ -95,6 +114,28 @@ def cmd_analyze(args) -> None:
         print("=" * 72)
         for line in calibration.interpret(z):
             print(line)
+
+
+def cmd_train_classifier(args) -> None:
+    from textscope.classifier import train_classifier
+
+    metrics = train_classifier(
+        hc3_path=args.hc3,
+        reference_corpus_dir=args.corpus_dir,
+        ai_samples_path=args.ai_samples,
+        out_dir=args.out,
+        base_model=args.base_model,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        device=args.device,
+    )
+    print(f"\nSaved to {args.out}")
+    print("Held-out test metrics:", metrics)
+    print(
+        "\nRead textscope/classifier.py's module docstring before trusting "
+        "this checkpoint on anything — this is a small, mixed-provenance "
+        "training set, not independently validated."
+    )
 
 
 def cmd_calibrate(args) -> None:
@@ -143,7 +184,33 @@ def main() -> None:
     a.add_argument("--no-disclaimer", action="store_true")
     a.add_argument("--no-rewrite", action="store_true",
                    help="skip the auto-applied rewrite section")
+    a.add_argument("--classifier", default=None,
+                   help="path to a fine-tuned checkpoint from "
+                        "'train-classifier' — adds a black-box P(AI) "
+                        "number; see textscope/classifier.py first")
+    a.add_argument("--classifier-device", default="cpu")
     a.set_defaults(func=cmd_analyze)
+
+    t = sub.add_parser(
+        "train-classifier",
+        help="fine-tune a supervised human/AI classifier (see "
+             "textscope/classifier.py before using this)",
+    )
+    t.add_argument("--hc3", required=True,
+                    help="path to HC3's all.jsonl (Hello-SimpleAI/HC3)")
+    t.add_argument("--corpus-dir", default="reference_corpus/txt",
+                    help="human/academic text chunks (default: this "
+                         "project's reference_corpus)")
+    t.add_argument("--ai-samples",
+                    default="reference_corpus/ai_academic_samples.jsonl",
+                    help="hand-written AI-academic-register examples "
+                         "(JSONL, one {'text': ...} per line)")
+    t.add_argument("--out", default="models/textscope-classifier")
+    t.add_argument("--base-model", default="roberta-base")
+    t.add_argument("--epochs", type=int, default=2)
+    t.add_argument("--batch-size", type=int, default=16)
+    t.add_argument("--device", default="cuda")
+    t.set_defaults(func=cmd_train_classifier)
 
     c = sub.add_parser("calibrate", help="build a reference corpus")
     c.add_argument("paths", nargs="+")

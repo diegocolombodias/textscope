@@ -24,6 +24,23 @@ WHAT THIS REPORT IS NOT
   them, and if the text is someone else's, talk to them.
 """
 
+CLASSIFIER_DISCLAIMER = """\
+ABOUT THE NUMBER ABOVE
+  This is the one deliberate exception in this tool: a black-box
+  probability from a supervised classifier, not an inspectable z-score.
+  It was trained on the public HC3 corpus plus this project's own small,
+  mixed-provenance data (see textscope/classifier.py and
+  reference_corpus/) — nowhere near the scale of real, audited training
+  data a commercial vendor like Turnitin uses. It has not been
+  independently validated. Check eval_metrics.json next to the model
+  checkpoint before trusting this number for anything, and treat it as a
+  rough prior, not a verdict — everything the DISCLAIMER above says about
+  false positives on formal or second-language prose applies here too,
+  just hidden behind a single number instead of a number you can audit.
+  English only — it was trained exclusively on English text and will
+  silently return a meaningless number on anything else.
+"""
+
 
 def build_report(
     text: str,
@@ -32,6 +49,7 @@ def build_report(
     per_sentence_surprisal: bool = True,
     include_rewrite: bool = True,
     reference: Optional[ReferenceStats] = None,
+    classifier=None,
 ) -> dict:
     """
     scorer: an optional LocalScorer instance. Omit it to run the
@@ -44,6 +62,12 @@ def build_report(
     corpus of real papers. When given, document_suggestions and the
     rewrite's "unresolved" list compare against it by z-score instead of
     the fixed heuristic thresholds — see stylometry._document_suggestions.
+
+    classifier: an optional textscope.classifier.ClassifierScorer. When
+    given, attaches an "ai_probability" key — a single black-box number,
+    the deliberate exception to everything else in this module (and in
+    DISCLAIMER below). See classifier.py's module docstring before using
+    this for anything that matters.
     """
     style: StyleReport = analyze_style(text, lang=lang, reference=reference)
     out: dict = {
@@ -82,6 +106,9 @@ def build_report(
                 out["lowest_surprisal_sentences"] = [
                     e["index"] for e in ranked[:3]
                 ]
+
+    if classifier is not None:
+        out["ai_probability"] = classifier.predict_proba(text).as_dict()
 
     return out
 
@@ -216,6 +243,18 @@ def render_text(
             "not a claim that the result reads better. Read it before "
             "keeping it. Per-sentence diff (original -> edited, with the "
             "reason for each change) is in --json output under \"rewrite\".")
+
+    if "ai_probability" in report:
+        ai = report["ai_probability"]
+        add("")
+        add("=" * 72)
+        add("AI-WRITING PROBABILITY (learned classifier — read the caveat)")
+        add("=" * 72)
+        add("")
+        add(f"  P(AI-written) = {ai['ai_probability']:.2%}"
+            f"  ({ai['n_windows']} window(s) averaged)")
+        add("")
+        add(CLASSIFIER_DISCLAIMER)
 
     if show_disclaimer:
         add("")
